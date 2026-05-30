@@ -115,6 +115,34 @@ On the Presto, `main.py` should be at the device root.
 
 Copy this repo to the Raspberry Pi, including your completed `src/secrets.py`.
 
+First, open an SSH terminal to the Pi. Replace `admin` and `YOUR_PI_IP` if your Pi uses a different username or IP address:
+
+```bash
+ssh admin@YOUR_PI_IP
+```
+
+Create a project folder on the Pi:
+
+```bash
+mkdir -p ~/PrestoDeck
+exit
+```
+
+Back on your computer, from inside the `PrestoDeck-2.0` folder, copy the project files to the Pi:
+
+```bash
+scp -r adhoc docs pi_bridge sd_card src README.md admin@YOUR_PI_IP:~/PrestoDeck/
+```
+
+If you are using a different Pi username, change `admin@YOUR_PI_IP` to match your setup.
+
+Then SSH back into the Pi and open the project folder:
+
+```bash
+ssh admin@YOUR_PI_IP
+cd ~/PrestoDeck
+```
+
 From the project folder on the Pi, run:
 
 ```bash
