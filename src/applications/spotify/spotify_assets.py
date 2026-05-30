@@ -130,7 +130,7 @@ def album_cache_key(track, size):
     return "{}_{}.jpg".format(key, size)
 
 
-def get_album_cover(track, size=250, allow_direct_fallback=False):
+def get_album_cover(track, size=250, allow_direct_fallback=True):
     """Fetches a resized album cover image, preferring cache or bridge."""
     cache_root = writable_cache_root()
     cache_path = cache_root + "/" + album_cache_key(track, size)
@@ -178,8 +178,7 @@ def get_album_cover_from_bridge(size):
     response = None
     try:
         response = requests.get(
-            "{}/album-art/current?size={}".format(SPOTIFY_BRIDGE_BASE_URL.rstrip("/"), size),
-            headers={"Connection": "close"},
+            "{}/album-art/current?size={}".format(SPOTIFY_BRIDGE_BASE_URL.rstrip("/"), size)
         )
         if response.status_code == 200:
             BRIDGE_IMAGE_RETRY_AT = 0
