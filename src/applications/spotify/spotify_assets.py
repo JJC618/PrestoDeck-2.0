@@ -178,7 +178,8 @@ def get_album_cover_from_bridge(size):
     response = None
     try:
         response = requests.get(
-            "{}/album-art/current?size={}".format(SPOTIFY_BRIDGE_BASE_URL.rstrip("/"), size)
+            "{}/album-art/current?size={}".format(SPOTIFY_BRIDGE_BASE_URL.rstrip("/"), size),
+            headers={"Connection": "close"},
         )
         if response.status_code == 200:
             BRIDGE_IMAGE_RETRY_AT = 0
