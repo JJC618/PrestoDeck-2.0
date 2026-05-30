@@ -13,9 +13,12 @@ class ControlButton():
         self.pngs = {}
         if icons:
             for icon in icons:
-                png = pngdec.PNG(display)
-                png.open_file(asset_path("icons/" + icon))
-                self.pngs[icon] = png
+                try:
+                    png = pngdec.PNG(display)
+                    png.open_file(asset_path("icons/" + icon))
+                    self.pngs[icon] = png
+                except Exception as e:
+                    print("Button icon not loaded:", icon, e)
 
         self.button = Button(*bounds)
         self.on_press = on_press
@@ -32,7 +35,9 @@ class ControlButton():
 
     def draw_icon(self):
         """Renders the button's icon centered inside its bounds."""
-        png = self.pngs[self.icon]
+        png = self.pngs.get(self.icon)
+        if png is None:
+            return
         x, y, width, height = self.button.bounds
         png_width, png_height = png.get_width(), png.get_height()
         x_offset = (width-png_width)//2

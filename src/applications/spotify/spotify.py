@@ -8,7 +8,6 @@ from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, Spot
 from applications.spotify.spotify_client import Session, SpotifyWebApiClient
 from applications.spotify.spotify_controls import ControlButton
 from applications.spotify.spotify_settings import (
-    AMBIENT_LED_COUNT,
     PLAYBACK_FETCH_INTERVAL,
     PLAYLIST_CACHE_SECONDS,
     SPOTIFY_BRIDGE_BASE_URL,
