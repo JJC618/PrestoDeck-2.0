@@ -17,14 +17,22 @@ For best performance, the Presto talks to a small Raspberry Pi bridge on your lo
 
 ## Setup Overview
 
-1. Create a Spotify Developer app.
-2. Generate your own Spotify credentials.
-3. Copy `src/secrets.example.py` to `src/secrets.py`.
-4. Fill in your WiFi, Spotify credentials, and Raspberry Pi bridge URL.
-5. Copy the app files to the Presto.
-6. Copy the icon files to the SD card.
-7. Install and start the Raspberry Pi bridge.
-8. Boot the Presto and test.
+1. Clone this repo and open the project folder.
+2. Create a Spotify Developer app.
+3. Generate your own Spotify credentials.
+4. Copy `src/secrets.example.py` to `src/secrets.py`.
+5. Fill in your WiFi, Spotify credentials, and Raspberry Pi bridge URL.
+6. Copy the app files to the Presto.
+7. Copy the icon files to the SD card.
+8. Install and start the Raspberry Pi bridge.
+9. Boot the Presto and test.
+
+## Clone The Repo
+
+```bash
+git clone https://github.com/JJC618/PrestoDeck-2.0.git
+cd PrestoDeck-2.0
+```
 
 ## Spotify Developer App
 
