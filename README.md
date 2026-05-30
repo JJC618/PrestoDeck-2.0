@@ -4,6 +4,10 @@ PrestoDeck 2.0 is a Spotify controller for the Pimoroni Presto. It shows current
 
 For best performance, the Presto talks to a small Raspberry Pi bridge on your local network. The Pi handles the heavier Spotify and album-art requests, leaving the Presto as a fast touch interface.
 
+![PrestoDeck 2.0](docs/PrestoDeck%202.0.jpg)
+
+![Full screen album art](docs/Full%20Screen.jpg)
+
 ## Hardware
 
 - Pimoroni Presto
