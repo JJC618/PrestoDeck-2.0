@@ -12,7 +12,15 @@ def prompt_credentials():
 def get_spotify_token(client_id, client_secret, redirect_uri):
     cache_handler = MemoryCacheHandler()
     auth = SpotifyOAuth(
-        scope='user-read-playback-state,user-modify-playback-state,user-read-recently-played',
+        scope=(
+            'user-read-playback-state,'
+            'user-modify-playback-state,'
+            'user-read-recently-played,'
+            'user-library-read,'
+            'user-library-modify,'
+            'playlist-modify-public,'
+            'playlist-modify-private'
+        ),
         client_id=client_id,
         client_secret=client_secret,
         redirect_uri=redirect_uri,

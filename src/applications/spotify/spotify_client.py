@@ -1,12 +1,23 @@
 import sys
 
 import urequests as requests
-import usocket as socket
 import ujson as json
 
 class SpotifyWebApiClient:
     def __init__(self, session):
         self.session = session
+
+    def devices(self):
+        """Fetches the list of available devices."""
+        return self.session.get(url='https://api.spotify.com/v1/me/player/devices')
+
+    def transfer_playback(self, device_id):
+        """Transfers playback to a new device."""
+        return self.session.put(
+            url='https://api.spotify.com/v1/me/player',
+            json={"device_ids": [device_id], "play": True},
+            add_device_id=False,
+        )
 
     def play(self, context_uri=None, uris=None, offset=None, position_ms=None):
         request_body = {}
@@ -21,7 +32,7 @@ class SpotifyWebApiClient:
 
         self.session.put(
             url='https://api.spotify.com/v1/me/player/play',
-            json=request_body,
+            json=request_body if request_body else None,
         )
 
     def pause(self):
@@ -36,9 +47,15 @@ class SpotifyWebApiClient:
         )
     
     def toggle_repeat(self, state):
-        value = "track" if state else 'off'
+        value = state if state in ("track", "context", "off") else "off"
         self.session.put(
             url=f'https://api.spotify.com/v1/me/player/repeat?state={value}',
+        )
+
+    def set_volume(self, volume_percent):
+        volume_percent = max(0, min(100, int(volume_percent)))
+        self.session.put(
+            url=f'https://api.spotify.com/v1/me/player/volume?volume_percent={volume_percent}',
         )
     
     def next(self):
@@ -61,6 +78,60 @@ class SpotifyWebApiClient:
             url='https://api.spotify.com/v1/me/player/recently-played?limit=1',
         )
 
+    def current_user_playlists(self, limit=20, offset=0):
+        """Fetches the current authenticated user's playlists."""
+        return self.session.get(
+            url=f'https://api.spotify.com/v1/me/playlists?limit={limit}&offset={offset}',
+        )
+
+    def queue(self):
+        """Fetches the user's current playback queue."""
+        return self.session.get(url='https://api.spotify.com/v1/me/player/queue')
+
+    def add_to_queue(self, uri):
+        """Adds a track or episode URI to the user's current playback queue."""
+        return self.session.post(
+            url=f'https://api.spotify.com/v1/me/player/queue?uri={quote(uri)}',
+        )
+
+    def search_tracks(self, query, limit=5):
+        """Searches Spotify tracks."""
+        return self.session.get(
+            url=f'https://api.spotify.com/v1/search?type=track&limit={limit}&q={quote_plus(query)}',
+        )
+
+    def liked_tracks_contains(self, track_id):
+        resp = self.session.get(
+            url=f'https://api.spotify.com/v1/me/library/contains?uris={quote(self.track_uri(track_id))}',
+        )
+        return bool(resp and resp[0])
+
+    def save_track(self, track_id):
+        return self.session.put(
+            url=f'https://api.spotify.com/v1/me/library?uris={quote(self.track_uri(track_id))}',
+            add_device_id=False,
+        )
+
+    def remove_saved_track(self, track_id):
+        return self.session.delete(
+            url=f'https://api.spotify.com/v1/me/library?uris={quote(self.track_uri(track_id))}',
+            add_device_id=False,
+        )
+
+    def track_uri(self, track_id_or_uri):
+        if track_id_or_uri.startswith("spotify:track:"):
+            return track_id_or_uri
+        return "spotify:track:" + track_id_or_uri
+
+    def add_track_to_playlist(self, playlist_uri, track_uri):
+        playlist_id = playlist_uri.split(":")[-1]
+        return self.session.post(
+            url=f'https://api.spotify.com/v1/playlists/{quote(playlist_id)}/tracks',
+            json={"uris": [track_uri]},
+            add_device_id=False,
+        )
+
+# ... (Rest of your original file remains unchanged)
 class Device:
     def __init__(
         self,
@@ -85,10 +156,10 @@ class Device:
         return 'Device(name={}, type={}, id={})'.format(self.name, self.type, self.id)
 
 class Session:
-    def __init__(self, credentials):
+    def __init__(self, credentials, lazy_token=False):
         self.credentials = credentials
         self.device_id = credentials['device_id']
-        if 'access_token' not in credentials:
+        if 'access_token' not in credentials and not lazy_token:
             self._refresh_access_token()
 
     def get(self, url, **kwargs):
@@ -101,37 +172,48 @@ class Session:
 
         return self._execute_request(get_request)
 
-    def put(self, url, json=None, **kwargs):
-        # Workaround for urequests not sending "Content-Length" on empty data
-        if json is None:
-            json = {}
+    def put(self, url, json=None, add_device_id=True, **kwargs):
+        json_data = {} if json is None else json
 
         def put_request():
             return requests.put(
-                url=self._add_device_id(url),
+                url=self._add_device_id(url) if add_device_id else url,
                 headers=self._headers(),
-                json=json,
+                json=json_data,
                 **kwargs,
             )
 
         return self._execute_request(put_request)
     
-    def post(self, url, json=None, **kwargs):
-        # Workaround for urequests not sending "Content-Length" on empty data
-        if json is None:
-            json = {}
+    def post(self, url, json=None, add_device_id=True, **kwargs):
+        json_data = {} if json is None else json
 
         def post_request():
             return requests.post(
-                url=self._add_device_id(url),
+                url=self._add_device_id(url) if add_device_id else url,
                 headers=self._headers(),
-                json=json,
+                json=json_data,
                 **kwargs,
             )
 
         return self._execute_request(post_request)
 
+    def delete(self, url, json=None, add_device_id=True, **kwargs):
+        json_data = {} if json is None else json
+
+        def delete_request():
+            return requests.delete(
+                url=self._add_device_id(url) if add_device_id else url,
+                headers=self._headers(),
+                json=json_data,
+                **kwargs,
+            )
+
+        return self._execute_request(delete_request)
+
     def _headers(self):
+        if 'access_token' not in self.credentials:
+            self._refresh_access_token()
         return {'Authorization': 'Bearer {access_token}'.format(**self.credentials)}
 
     def _execute_request(self, request):
@@ -183,6 +265,7 @@ class Session:
             client_secret=self.credentials['client_secret'],
         )
         retries = 3
+        response = None
         while retries:
             try:
                 response = requests.post(
@@ -192,12 +275,16 @@ class Session:
                 )
                 self._check_status_code(response)
                 retries -= 1
+                break
             except Exception as E:
                 retries -= 1
                 if retries:
                     print("Failed to refresh access token, retrying")
                 else:
                     print("Failed to refresh access token after 3 tries, giving up")
+
+        if response is None:
+            raise SpotifyWebApiError("Failed to refresh access token")
 
         tokens = response.json()
         response.close()
