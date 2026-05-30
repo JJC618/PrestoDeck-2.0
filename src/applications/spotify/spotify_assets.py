@@ -1,4 +1,5 @@
 import os
+import time
 import urequests as requests
 
 from applications.spotify.spotify_settings import (
@@ -10,6 +11,9 @@ from applications.spotify.spotify_settings import (
     SD_ASSET_ROOTS,
     USE_SPOTIFY_BRIDGE,
 )
+
+BRIDGE_IMAGE_RETRY_AT = 0
+BRIDGE_IMAGE_RETRY_SECONDS = 30
 
 
 def file_exists(path):
@@ -166,16 +170,24 @@ def get_album_cover(track, size=250, allow_direct_fallback=False):
 
 
 def get_album_cover_from_bridge(size):
+    global BRIDGE_IMAGE_RETRY_AT
+
+    if time.time() < BRIDGE_IMAGE_RETRY_AT:
+        return None
+
     response = None
     try:
         response = requests.get(
             "{}/album-art/current?size={}".format(SPOTIFY_BRIDGE_BASE_URL.rstrip("/"), size)
         )
         if response.status_code == 200:
+            BRIDGE_IMAGE_RETRY_AT = 0
             return response.content
         print("Failed to fetch bridge image:", response.status_code)
+        BRIDGE_IMAGE_RETRY_AT = time.time() + BRIDGE_IMAGE_RETRY_SECONDS
     except Exception as e:
         print("Bridge image fetch error:", e)
+        BRIDGE_IMAGE_RETRY_AT = time.time() + BRIDGE_IMAGE_RETRY_SECONDS
     finally:
         if response:
             response.close()
