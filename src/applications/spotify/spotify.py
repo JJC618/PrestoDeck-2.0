@@ -8,11 +8,7 @@ from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, Spot
 from applications.spotify.spotify_client import Session, SpotifyWebApiClient
 from applications.spotify.spotify_controls import ControlButton
 from applications.spotify.spotify_settings import (
-    AMBIENT_DIM_RGB,
     AMBIENT_LED_COUNT,
-    DISPLAY_BRIGHTNESS_ACTIVE,
-    DISPLAY_BRIGHTNESS_DIM,
-    DISPLAY_DIM_TIMEOUT,
     PLAYBACK_FETCH_INTERVAL,
     PLAYLIST_CACHE_SECONDS,
     SPOTIFY_BRIDGE_BASE_URL,
@@ -82,7 +78,6 @@ class Spotify(BaseApp):
         self.bridge_ok_pen = self.display.create_pen(89, 188, 97)
         self.bridge_bad_pen = self.display.create_pen(255, 0, 0)
         self.bridge_unknown_pen = self.ui_gray_pen
-        self.display_dimmed = False
         self.setup_buttons()
 
     def wait_for_message_minimum(self, started_at, seconds):
@@ -116,29 +111,6 @@ class Spotify(BaseApp):
             return None
         finally:
             self.state.api_busy = False
-
-    def set_display_dimmed(self, dimmed):
-        if self.display_dimmed == dimmed:
-            return
-
-        try:
-            self.presto.set_backlight(DISPLAY_BRIGHTNESS_DIM if dimmed else DISPLAY_BRIGHTNESS_ACTIVE)
-            self.set_ambient_lights_dimmed(dimmed)
-            self.display_dimmed = dimmed
-        except Exception as e:
-            print("Failed changing display brightness:", e)
-
-    def set_ambient_lights_dimmed(self, dimmed):
-        if not self.state.toggle_leds:
-            return
-
-        if dimmed:
-            self.presto.auto_ambient_leds(False)
-            for i in range(AMBIENT_LED_COUNT):
-                self.presto.set_led_rgb(i, *AMBIENT_DIM_RGB)
-        else:
-            self.presto.auto_ambient_leds(True)
-        self.presto.update()
 
     def render_speaker_screen(self):
         self.clear(1)
@@ -284,8 +256,6 @@ class Spotify(BaseApp):
             else:
                 self.toggle_leds(not self.state.toggle_leds)
                 self.state.toggle_leds = not self.state.toggle_leds
-                if self.display_dimmed:
-                    self.set_ambient_lights_dimmed(True)
             self.state.fullscreen_art = False
             self.state.force_redraw = True
 
@@ -871,7 +841,6 @@ class Spotify(BaseApp):
                 if self.state.menu_mode == 0 and self.state.volume_buttons_hidden:
                     self.state.volume_buttons_hidden = False
                     self.state.force_redraw = True
-                self.set_display_dimmed(False)
 
             if self.state.menu_mode == 1:
                 if self.touch.state:
@@ -1353,8 +1322,6 @@ class Spotify(BaseApp):
                 if self.state.menu_mode == 0 and self.state.volume_buttons_hidden:
                     self.state.volume_buttons_hidden = False
                     self.state.force_redraw = True
-            if time.time() - self.state.last_touch_time > DISPLAY_DIM_TIMEOUT:
-                self.set_display_dimmed(True)
             if (
                 self.state.menu_mode == 0 and
                 not self.state.fullscreen_art and
