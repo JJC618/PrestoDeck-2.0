@@ -18,6 +18,8 @@ def get_spotify_token(client_id, client_secret, redirect_uri):
             'user-read-recently-played,'
             'user-library-read,'
             'user-library-modify,'
+            'playlist-read-private,'
+            'playlist-read-collaborative,'
             'playlist-modify-public,'
             'playlist-modify-private'
         ),

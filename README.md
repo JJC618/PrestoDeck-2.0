@@ -172,6 +172,7 @@ sudo systemctl restart presto-spotify-bridge
 ## Troubleshooting
 
 - If the Presto says `Bridge Failed`, check the Pi IP address and restart the bridge service.
+- If playlists show as `None Found`, regenerate Spotify credentials with the included helper script. The token must include playlist read permissions.
 - If liked songs or playlist adding does not work, regenerate Spotify credentials with the included helper script.
 - If the SD card fails to mount, check the card format and icon file layout.
 - If album art is slow, make sure the Raspberry Pi bridge is active.
