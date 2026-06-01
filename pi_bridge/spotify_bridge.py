@@ -165,8 +165,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self.attach_liked_state(state)
             track = state.get("item") if state else None
             if track:
-                for size in ALBUM_ART_PRELOAD_SIZES:
-                    self.preload_track_album_art(track, size)
+                self.preload_current_album_art_soon(track)
             self.preload_queue_album_art_soon()
             return state
         if path == "/state":
@@ -244,6 +243,21 @@ class BridgeHandler(BaseHTTPRequestHandler):
             payload = f.read()
         self.send_bytes(payload, "image/jpeg")
         return None
+
+    def preload_current_album_art_soon(self, track):
+        thread = threading.Thread(
+            target=self.preload_current_album_art,
+            args=(track,),
+            daemon=True,
+        )
+        thread.start()
+
+    def preload_current_album_art(self, track):
+        try:
+            for size in ALBUM_ART_PRELOAD_SIZES:
+                self.preload_track_album_art(track, size)
+        except Exception as e:
+            print("Current album-art preload failed:", e)
 
     def preload_queue_album_art_soon(self, queue_response=None):
         if time.time() - self.__class__.last_queue_preload < QUEUE_PRELOAD_SECONDS:
