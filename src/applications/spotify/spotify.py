@@ -289,12 +289,15 @@ class Spotify(BaseApp):
         if align_right:
             left_bounds = (245, nav_y, 70, 45)
             right_bounds = (self.width - 80, nav_y, 70, 45)
-            page_x = left_bounds[0] - 42
         else:
             left_bounds = (145, nav_y, 70, 45)
             right_bounds = (self.width - 215, nav_y, 70, 45)
-            page_x = self.center_x - 12
         page_text = "{}/{}".format(page + 1, total_pages)
+        page_scale = 0.6
+        left_center = left_bounds[0] + (left_bounds[2] // 2)
+        right_center = right_bounds[0] + (right_bounds[2] // 2)
+        page_center = (left_center + right_center) // 2
+        page_x = page_center - (self.measure_text_width(page_text, page_scale) // 2)
 
         try:
             left = pngdec.PNG(self.display)
@@ -312,7 +315,7 @@ class Spotify(BaseApp):
             print("Menu nav icons not loaded:", e)
 
         self.display.set_pen(self.ui_gray_pen)
-        self.display.text(page_text, page_x, nav_y + 18, scale=0.6)
+        self.display.text(page_text, page_x, nav_y + 18, scale=page_scale)
 
     def render_speaker_screen(self):
         self.clear(1)
@@ -331,7 +334,7 @@ class Spotify(BaseApp):
         self.device_nav_zones = []
         y = 70
         row_height = 50
-        items_per_page = 7
+        items_per_page = 5
         total_pages = max(1, (len(self.state.devices_data) + items_per_page - 1) // items_per_page)
         self.state.device_page = min(self.state.device_page, total_pages - 1)
         page_start = self.state.device_page * items_per_page
@@ -563,7 +566,8 @@ class Spotify(BaseApp):
                 self.state.devices_data = [
                     (d["name"], d["id"], d.get("is_active", False))
                     for d in resp["devices"] if d
-                ][:5]
+                ]
+                self.state.device_page = 0
         except Exception as e:
             print("Error retrieving network speakers:", e)
             self.state.devices_data = []
