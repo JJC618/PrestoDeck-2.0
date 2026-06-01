@@ -243,4 +243,4 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Credits
 
-Built from the original PrestoDeck idea and adapted into a Raspberry Pi assisted Spotify controller for the Pimoroni Presto.
+Built from the original PrestoDeck app by Fatih Ak and adapted into a Raspberry Pi assisted Spotify controller for the Pimoroni Presto.
