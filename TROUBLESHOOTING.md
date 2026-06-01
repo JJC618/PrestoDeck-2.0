@@ -107,6 +107,14 @@ If you see:
 
 wait that many seconds before trying again.
 
+If the Presto shows:
+
+```text
+Bridge Blocked 120s
+```
+
+the bridge has detected Spotify's cooldown timer and has paused Spotify API calls until the countdown finishes. Leave the Pi bridge running and wait for the timer to reach zero. The Presto checks the bridge status about every 15 seconds, so the number may update in small jumps.
+
 Safe command while waiting:
 
 ```bash
