@@ -96,6 +96,44 @@ The simplest layout is:
 /sd/icons/*.png
 ```
 
+## Upload Checklist
+
+When updating or installing from scratch, make sure all three targets are updated from the same repo version.
+
+Presto device root:
+
+```text
+main.py
+base.py
+secrets.py
+applications/
+```
+
+SD card root:
+
+```text
+icon.png
+icons/
+```
+
+Raspberry Pi project folder:
+
+```text
+~/PrestoDeck/adhoc
+~/PrestoDeck/docs
+~/PrestoDeck/pi_bridge
+~/PrestoDeck/sd_card
+~/PrestoDeck/src
+~/PrestoDeck/README.md
+~/PrestoDeck/TROUBLESHOOTING.md
+```
+
+After updating the Pi files, restart the bridge:
+
+```bash
+sudo systemctl restart presto-spotify-bridge
+```
+
 ## Upload To Presto
 
 Use Thonny or your preferred MicroPython upload tool.
@@ -172,6 +210,36 @@ sudo systemctl restart presto-spotify-bridge
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, playlist, album-art, SD card, and Raspberry Pi service issues.
+
+## Changelog
+
+### 0.2.4
+
+- Added Spotify API blocked messages to search results and speaker selection screens.
+- Improved blocked-message readability on the Presto.
+
+### 0.2.3
+
+- Added boot checks for SD card mount failures and missing SD card icons.
+- Added troubleshooting guidance for red boot error messages.
+
+### 0.2.2
+
+- Centred player visuals, including album art, placeholder icon, and play/pause control positioning.
+
+### 0.2.1
+
+- Improved startup and blocked-message text centring.
+- Hid the loading message on the player screen when Spotify is API-blocked.
+
+### 0.2.0
+
+- Added startup diagnostics, bridge health details, and visible Spotify API blocked states.
+- Added version reporting for the Presto app and Raspberry Pi bridge.
+
+### 0.1.0
+
+- Added playlist and speaker paging controls.
 
 ## Credits
 
