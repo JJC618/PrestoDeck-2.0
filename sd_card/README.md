@@ -20,6 +20,7 @@ Format the SD card as FAT32 and copy your Spotify UI assets into this layout:
   like.png
   light_off.png
   light_on.png
+  left_arrow.png
   next.png
   pause.png
   play.png
@@ -28,6 +29,7 @@ Format the SD card as FAT32 and copy your Spotify UI assets into this layout:
   repeat_off.png
   repeat_on.png
   repeat_on_1.png
+  right_arrow.png
   search.png
   shuffle_off.png
   shuffle_on.png

@@ -57,12 +57,14 @@ class Spotify(BaseApp):
         self.j = jpegdec.JPEG(self.display)
         self.device_zones = []
         self.playlist_zones = []
+        self.playlist_nav_zones = []
         self.queue_zones = []
         self.keyboard_zones = []
         self.search_result_zones = []
         self.search_action_zones = []
         self.like_action_zones = []
         self.add_playlist_zones = []
+        self.device_nav_zones = []
         self.playlists_data = []
         self.playlists_fetched_at = 0
         self.album_art_bounds = None
@@ -163,6 +165,34 @@ class Spotify(BaseApp):
             self.state.playback_fetch_at = time.time() + 2
             self.state.force_redraw = True
 
+    def draw_menu_nav(self, page, total_pages, zones):
+        zones.clear()
+        if total_pages <= 1:
+            return
+
+        nav_y = self.height - 48
+        left_bounds = (135, nav_y, 70, 45)
+        right_bounds = (self.width - 205, nav_y, 70, 45)
+        page_text = "{}/{}".format(page + 1, total_pages)
+
+        try:
+            left = pngdec.PNG(self.display)
+            left.open_file(asset_path("icons/left_arrow.png"))
+            right = pngdec.PNG(self.display)
+            right.open_file(asset_path("icons/right_arrow.png"))
+
+            if page > 0:
+                left.decode(left_bounds[0] + (left_bounds[2] - left.get_width()) // 2, left_bounds[1] + 7)
+                zones.append(("prev", left_bounds))
+            if page < total_pages - 1:
+                right.decode(right_bounds[0] + (right_bounds[2] - right.get_width()) // 2, right_bounds[1] + 7)
+                zones.append(("next", right_bounds))
+        except Exception as e:
+            print("Menu nav icons not loaded:", e)
+
+        self.display.set_pen(self.ui_gray_pen)
+        self.display.text(page_text, self.center_x - 12, nav_y + 13, scale=0.6)
+
     def render_speaker_screen(self):
         self.clear(1)
         self.display.set_pen(self.colors._BLACK)
@@ -177,9 +207,16 @@ class Spotify(BaseApp):
                 button.draw(self.state)
 
         self.device_zones = []
+        self.device_nav_zones = []
         y = 70
         row_height = 50
-        for name, dev_id, is_active in self.state.devices_data:
+        items_per_page = 7
+        total_pages = max(1, (len(self.state.devices_data) + items_per_page - 1) // items_per_page)
+        self.state.device_page = min(self.state.device_page, total_pages - 1)
+        page_start = self.state.device_page * items_per_page
+        page_devices = self.state.devices_data[page_start:page_start + items_per_page]
+
+        for name, dev_id, is_active in page_devices:
             display_name = name if len(name) <= 26 else name[:24] + ".."
             self.display.set_pen(self.ui_gray_pen)
             self.display.line(15, y + row_height - 5, self.width - 15, y + row_height - 5)
@@ -189,6 +226,7 @@ class Spotify(BaseApp):
             y += row_height
         if not self.state.devices_data:
             self.display.text("No Speakers Found", 25, y, scale=0.8)
+        self.draw_menu_nav(self.state.device_page, total_pages, self.device_nav_zones)
         self.presto.update()
             
     def get_spotify_client(self):
@@ -828,11 +866,13 @@ class Spotify(BaseApp):
             if resp and "items" in resp:
                 items = resp["items"]
                 raw_list = [(p["name"], p["uri"]) for p in items if p]
-                self.playlists_data = raw_list[:5]
+                self.playlists_data = raw_list
+                self.state.playlist_page = 0
                 self.playlists_fetched_at = time.time()
         except Exception as e:
             print("Error retrieving playlists:", e)
             self.playlists_data = []
+            self.state.playlist_page = 0
 
         self.state.force_redraw = True
 
@@ -840,6 +880,7 @@ class Spotify(BaseApp):
         """Draws playlist navigation with a speaker-menu shortcut."""
         self.clear(1)
         self.playlist_zones = []
+        self.playlist_nav_zones = []
         self.device_zones = []
 
         self.display.set_pen(self.colors._BLACK)
@@ -862,7 +903,13 @@ class Spotify(BaseApp):
         if not self.playlists_data:
             self.display.text("None Found", 30, y_offset, scale=0.7)
         else:
-            for name, uri in self.playlists_data:
+            items_per_page = 6
+            total_pages = max(1, (len(self.playlists_data) + items_per_page - 1) // items_per_page)
+            self.state.playlist_page = min(self.state.playlist_page, total_pages - 1)
+            page_start = self.state.playlist_page * items_per_page
+            page_playlists = self.playlists_data[page_start:page_start + items_per_page]
+
+            for name, uri in page_playlists:
                 display_name = name if len(name) <= 26 else name[:24] + ".."
                 self.display.set_pen(self.ui_gray_pen)
                 self.display.line(15, y_offset + row_height - 5, self.width - 15, y_offset + row_height - 5)
@@ -872,6 +919,7 @@ class Spotify(BaseApp):
                 
                 self.playlist_zones.append((uri, (0, y_offset, self.width, row_height)))
                 y_offset += row_height
+            self.draw_menu_nav(self.state.playlist_page, total_pages, self.playlist_nav_zones)
 
         self.presto.update()
 
@@ -898,24 +946,36 @@ class Spotify(BaseApp):
                     tx, ty = self.touch.x, self.touch.y
                     hit_action = False
 
-                    for target, bounds in self.playlist_zones:
+                    for direction, bounds in self.playlist_nav_zones:
                         bx, by, bw, bh = bounds
                         if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
                             hit_action = True
-                            print(f"Selected Playlist URI: {target}")
-                            try:
-                                self.spotify_client.play(context_uri=target)
-                                self.state.is_playing = True
-                            except Exception as e:
-                                print("Failed starting context play:", e)
-                            self.state.menu_mode = 0
-                            self.clear(1)
-                            self.state.latest_fetch = None
+                            if direction == "prev":
+                                self.state.playlist_page = max(0, self.state.playlist_page - 1)
+                            else:
+                                self.state.playlist_page += 1
                             self.state.force_redraw = True
-                            self.state.fullscreen_art = False
-                            self.state.devices_data = []
-                            self.state.queue_data = []
                             break
+
+                    if not hit_action:
+                        for target, bounds in self.playlist_zones:
+                            bx, by, bw, bh = bounds
+                            if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
+                                hit_action = True
+                                print(f"Selected Playlist URI: {target}")
+                                try:
+                                    self.spotify_client.play(context_uri=target)
+                                    self.state.is_playing = True
+                                except Exception as e:
+                                    print("Failed starting context play:", e)
+                                self.state.menu_mode = 0
+                                self.clear(1)
+                                self.state.latest_fetch = None
+                                self.state.force_redraw = True
+                                self.state.fullscreen_art = False
+                                self.state.devices_data = []
+                                self.state.queue_data = []
+                                break
 
                     if not hit_action:
                         for button in self.buttons:
@@ -934,24 +994,36 @@ class Spotify(BaseApp):
                     tx, ty = self.touch.x, self.touch.y
                     hit_action = False
 
-                    for dev_id, bounds in self.device_zones:
+                    for direction, bounds in self.device_nav_zones:
                         bx, by, bw, bh = bounds
                         if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
                             hit_action = True
-                            print(f"Transferring playback to device: {dev_id}")
-                            try:
-                                self.spotify_client.transfer_playback(dev_id)
-                                self.spotify_client.session.device_id = dev_id
-                                self.state.devices_data = [
-                                    (name, item_dev_id, item_dev_id == dev_id)
-                                    for name, item_dev_id, is_active in self.state.devices_data
-                                ]
-                            except Exception as e:
-                                print("Failed device transfer:", e)
-                            self.state.menu_mode = 1
-                            self.state.fullscreen_art = False
+                            if direction == "prev":
+                                self.state.device_page = max(0, self.state.device_page - 1)
+                            else:
+                                self.state.device_page += 1
                             self.state.force_redraw = True
                             break
+
+                    if not hit_action:
+                        for dev_id, bounds in self.device_zones:
+                            bx, by, bw, bh = bounds
+                            if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
+                                hit_action = True
+                                print(f"Transferring playback to device: {dev_id}")
+                                try:
+                                    self.spotify_client.transfer_playback(dev_id)
+                                    self.spotify_client.session.device_id = dev_id
+                                    self.state.devices_data = [
+                                        (name, item_dev_id, item_dev_id == dev_id)
+                                        for name, item_dev_id, is_active in self.state.devices_data
+                                    ]
+                                except Exception as e:
+                                    print("Failed device transfer:", e)
+                                self.state.menu_mode = 1
+                                self.state.fullscreen_art = False
+                                self.state.force_redraw = True
+                                break
 
                     if not hit_action:
                         for button in self.buttons:

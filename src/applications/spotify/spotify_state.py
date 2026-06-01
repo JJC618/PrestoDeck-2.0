@@ -26,6 +26,8 @@ class State:
         self.playback_fetch_track_id = None
         self.devices_data = []
         self.queue_data = []
+        self.playlist_page = 0
+        self.device_page = 0
         self.search_query = ""
         self.search_results = []
         self.selected_search_index = None
@@ -56,6 +58,8 @@ class State:
         state.track = {'id': self.track['id']} if self.track else None
         state.devices_data = list(self.devices_data)
         state.queue_data = list(self.queue_data)
+        state.playlist_page = self.playlist_page
+        state.device_page = self.device_page
         state.search_query = self.search_query
         state.search_results = list(self.search_results)
         state.selected_search_index = self.selected_search_index
@@ -85,6 +89,8 @@ class State:
             self.menu_mode == other.menu_mode and
             self.devices_data == other.devices_data and
             self.queue_data == other.queue_data and
+            self.playlist_page == other.playlist_page and
+            self.device_page == other.device_page and
             self.search_query == other.search_query and
             self.search_results == other.search_results and
             self.selected_search_index == other.selected_search_index and
