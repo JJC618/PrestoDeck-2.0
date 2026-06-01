@@ -2,6 +2,7 @@ import os
 import time
 import urequests as requests
 
+from applications.spotify.spotify_client import quote
 from applications.spotify.spotify_settings import (
     ALBUM_ART_CACHE_DIR,
     ALBUM_ART_CACHE_MAX_BYTES,
@@ -142,7 +143,7 @@ def get_album_cover(track, size=250, allow_direct_fallback=True):
         pass
 
     if USE_SPOTIFY_BRIDGE:
-        img = get_album_cover_from_bridge(size)
+        img = get_album_cover_from_bridge(track, size)
         if img:
             save_album_cover_to_cache(cache_root, cache_path, img, "Failed caching bridge image:")
             return img
@@ -169,16 +170,26 @@ def get_album_cover(track, size=250, allow_direct_fallback=True):
     return img
 
 
-def get_album_cover_from_bridge(size):
+def get_album_cover_from_bridge(track, size):
     global BRIDGE_IMAGE_RETRY_AT
 
     if time.time() < BRIDGE_IMAGE_RETRY_AT:
         return None
 
+    images = track["album"]["images"]
+    image_index = 0 if size > 250 or len(images) == 1 else 1
+    image_url = images[image_index]["url"]
+    track_id = track.get("id") or track.get("uri", "unknown").split(":")[-1]
+
     response = None
     try:
         response = requests.get(
-            "{}/album-art/current?size={}".format(SPOTIFY_BRIDGE_BASE_URL.rstrip("/"), size)
+            "{}/album-art/current?size={}&track_id={}&image_url={}".format(
+                SPOTIFY_BRIDGE_BASE_URL.rstrip("/"),
+                size,
+                quote(track_id),
+                quote(image_url),
+            )
         )
         if response.status_code == 200:
             BRIDGE_IMAGE_RETRY_AT = 0

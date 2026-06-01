@@ -50,7 +50,7 @@ QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
-BRIDGE_VERSION = "0.2.6"
+BRIDGE_VERSION = "0.2.7"
 
 
 class SpotifyBridgeError(Exception):
@@ -306,13 +306,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def send_current_album_art(self, query):
         size = int(query.get("size", ["250"])[0])
         size = max(64, min(640, size))
-        state = self.get_playback_state(max_age=10)
-        track = state.get("item") if state else None
-        if not track:
-            raise SpotifyBridgeError(404, "No current track")
+        track_id = query.get("track_id", [""])[0]
+        image_url = query.get("image_url", [""])[0]
 
-        image_url = self.album_image_url(track, size)
-        cache_path = self.album_art_cache_path(track, image_url, size)
+        if track_id and image_url:
+            cache_path = self.album_art_cache_path_for_key(track_id, size)
+        else:
+            state = self.get_playback_state(max_age=10)
+            track = state.get("item") if state else None
+            if not track:
+                raise SpotifyBridgeError(404, "No current track")
+            image_url = self.album_image_url(track, size)
+            cache_path = self.album_art_cache_path(track, image_url, size)
+
         if not cache_path.exists():
             self.fetch_album_art(image_url, size, cache_path)
 
@@ -397,6 +403,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         ALBUM_ART_CACHE.mkdir(parents=True, exist_ok=True)
         album = track.get("album", {})
         key = album.get("id") or track.get("id") or hashlib.sha1(image_url.encode()).hexdigest()
+        return self.album_art_cache_path_for_key(key, size)
+
+    def album_art_cache_path_for_key(self, key, size):
+        ALBUM_ART_CACHE.mkdir(parents=True, exist_ok=True)
         return ALBUM_ART_CACHE / "{}_{}.jpg".format(key, size)
 
     def fetch_album_art(self, image_url, size, cache_path):
