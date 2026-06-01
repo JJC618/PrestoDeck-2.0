@@ -67,6 +67,8 @@ class Spotify(BaseApp):
         self.device_nav_zones = []
         self.playlists_data = []
         self.playlists_fetched_at = 0
+        self.bridge_status_next_at = 0
+        self.bridge_status_label = None
         self.album_art_bounds = None
         self.pending_art_track_id = None
         self.pending_art_fullscreen = False
@@ -575,6 +577,15 @@ class Spotify(BaseApp):
         self.presto.update()
 
     def draw_bridge_status(self):
+        block_remaining = 0
+        if hasattr(self.spotify_client, "spotify_block_remaining"):
+            block_remaining = self.spotify_client.spotify_block_remaining()
+        if block_remaining:
+            self.display.set_pen(self.bridge_bad_pen)
+            label = "Bridge Blocked {}s".format(block_remaining)
+            self.display.text(label, 10, self.height - 24, scale=0.6)
+            return
+
         bridge_available = getattr(self.spotify_client, "bridge_available", None)
         if bridge_available is True:
             self.display.set_pen(self.bridge_ok_pen)
@@ -586,6 +597,34 @@ class Spotify(BaseApp):
             self.display.set_pen(self.bridge_unknown_pen)
             label = "Bridge Unknown"
         self.display.text(label, 10, self.height - 24, scale=0.6)
+
+    def bridge_status_text(self):
+        block_remaining = 0
+        if hasattr(self.spotify_client, "spotify_block_remaining"):
+            block_remaining = self.spotify_client.spotify_block_remaining()
+        if block_remaining:
+            return "Bridge Blocked {}s".format(block_remaining)
+        bridge_available = getattr(self.spotify_client, "bridge_available", None)
+        if bridge_available is True:
+            return "Bridge Active"
+        if bridge_available is False:
+            return "Bridge Failed"
+        return "Bridge Unknown"
+
+    def refresh_bridge_status_if_due(self):
+        if not hasattr(self.spotify_client, "refresh_bridge_status"):
+            return
+        now = time.time()
+        if now < self.bridge_status_next_at:
+            return
+        previous_label = self.bridge_status_text()
+        self.bridge_status_next_at = now + 15
+        self.spotify_client.refresh_bridge_status()
+        current_label = self.bridge_status_text()
+        if current_label != previous_label or current_label != self.bridge_status_label:
+            self.bridge_status_label = current_label
+            if self.state.menu_mode == 1:
+                self.state.force_redraw = True
 
     def render_search_results(self):
         """Draws track search results."""
@@ -1459,6 +1498,7 @@ class Spotify(BaseApp):
         self.presto.update()
 
         while not self.state.exit:
+            self.refresh_bridge_status_if_due()
             self.touch.poll()
             if self.touch.state:
                 self.state.last_touch_time = time.time()

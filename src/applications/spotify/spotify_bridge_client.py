@@ -5,6 +5,13 @@ import time
 from applications.spotify.spotify_client import quote, quote_plus
 
 
+class BridgeHttpError(Exception):
+    def __init__(self, status_code, message, retry_after=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.retry_after = retry_after
+
+
 class BridgeSession:
     def __init__(self):
         self.device_id = None
@@ -17,6 +24,9 @@ class SpotifyBridgeClient:
 
     def devices(self):
         return self.get("/devices")
+
+    def health(self):
+        return self.get("/health")
 
     def startup_state(self):
         return self.get("/startup")
@@ -102,7 +112,15 @@ class SpotifyBridgeClient:
     def read_response(self, response):
         try:
             if response.status_code >= 400:
-                raise Exception("Bridge HTTP {}".format(response.status_code))
+                retry_after = None
+                message = "Bridge HTTP {}".format(response.status_code)
+                try:
+                    payload = response.json()
+                    message = payload.get("error", message)
+                    retry_after = payload.get("retry_after")
+                except Exception:
+                    pass
+                raise BridgeHttpError(response.status_code, message, retry_after)
             if response.content:
                 return response.json()
             return {}
@@ -116,17 +134,33 @@ class SpotifyBridgeFallbackClient:
         self.local_client = local_client
         self.session = bridge_client.session
         self.bridge_retry_at = 0
+        self.bridge_status_checked_at = 0
+        self.spotify_blocked_until = 0
         self.bridge_available = None
 
     def devices(self):
         return self.call("devices")
 
     def startup_state(self):
+        if self.spotify_block_remaining():
+            self.bridge_available = False
+            raise Exception("Spotify API blocked for {}s".format(self.spotify_block_remaining()))
         try:
             result = self.bridge_client.startup_state()
             self.session = self.bridge_client.session
             self.bridge_retry_at = 0
+            self.spotify_blocked_until = 0
             self.bridge_available = True
+            return result
+        except BridgeHttpError as e:
+            if e.status_code == 429:
+                self.note_spotify_block(e.retry_after)
+                raise
+            print("Bridge startup unavailable, using local Spotify API:", e)
+            self.bridge_retry_at = time.time() + 30
+            self.bridge_available = False
+            result = self.local_client.current_playing()
+            self.session = self.local_client.session
             return result
         except Exception as e:
             print("Bridge startup unavailable, using local Spotify API:", e)
@@ -193,6 +227,10 @@ class SpotifyBridgeFallbackClient:
         return self.call("add_track_to_playlist", playlist_uri, track_uri)
 
     def call(self, method_name, *args, **kwargs):
+        if self.spotify_block_remaining():
+            self.bridge_available = False
+            raise Exception("Spotify API blocked for {}s".format(self.spotify_block_remaining()))
+
         if time.time() < self.bridge_retry_at:
             self.bridge_available = False
             result = getattr(self.local_client, method_name)(*args, **kwargs)
@@ -203,7 +241,18 @@ class SpotifyBridgeFallbackClient:
             result = getattr(self.bridge_client, method_name)(*args, **kwargs)
             self.session = self.bridge_client.session
             self.bridge_retry_at = 0
+            self.spotify_blocked_until = 0
             self.bridge_available = True
+            return result
+        except BridgeHttpError as e:
+            if e.status_code == 429:
+                self.note_spotify_block(e.retry_after)
+                raise
+            print("Bridge unavailable, using local Spotify API:", e)
+            self.bridge_retry_at = time.time() + 30
+            self.bridge_available = False
+            result = getattr(self.local_client, method_name)(*args, **kwargs)
+            self.session = self.local_client.session
             return result
         except Exception as e:
             print("Bridge unavailable, using local Spotify API:", e)
@@ -215,3 +264,32 @@ class SpotifyBridgeFallbackClient:
 
     def active_client(self):
         return self.local_client if self.session is self.local_client.session else self.bridge_client
+
+    def note_spotify_block(self, retry_after):
+        try:
+            seconds = int(float(retry_after))
+        except (TypeError, ValueError):
+            seconds = 60
+        self.spotify_blocked_until = max(self.spotify_blocked_until, time.time() + seconds)
+        self.bridge_retry_at = self.spotify_blocked_until
+        self.bridge_available = False
+
+    def spotify_block_remaining(self):
+        return max(0, int(self.spotify_blocked_until - time.time()))
+
+    def refresh_bridge_status(self):
+        try:
+            resp = self.bridge_client.health()
+            self.bridge_status_checked_at = time.time()
+            if resp and resp.get("spotify_blocked"):
+                self.note_spotify_block(resp.get("retry_after"))
+            elif self.spotify_block_remaining() == 0:
+                self.spotify_blocked_until = 0
+                self.bridge_retry_at = 0
+                self.bridge_available = True
+            return resp
+        except Exception as e:
+            print("Bridge status unavailable:", e)
+            self.bridge_status_checked_at = time.time()
+            self.bridge_available = False
+            return None

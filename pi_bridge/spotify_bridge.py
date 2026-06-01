@@ -138,6 +138,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
     state_cache = None
     state_cache_at = 0
     presto_active_until = 0
+    spotify_blocked_until = 0
 
     def log_message(self, fmt, *args):
         print("{} - {}".format(self.address_string(), fmt % args))
@@ -160,6 +161,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 data = self.handle_post(parsed.path, query, self.read_json_body())
             self.send_json(data)
         except SpotifyBridgeError as e:
+            if e.status == 429 and e.retry_after:
+                self.set_spotify_block(e.retry_after)
             payload = {"error": e.message}
             if e.retry_after:
                 payload["retry_after"] = e.retry_after
@@ -174,9 +177,35 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def presto_is_active(self):
         return time.time() < self.__class__.presto_active_until
 
+    def spotify_block_remaining(self):
+        remaining = int(self.__class__.spotify_blocked_until - time.time())
+        return max(0, remaining)
+
+    def set_spotify_block(self, retry_after):
+        try:
+            seconds = int(float(retry_after))
+        except (TypeError, ValueError):
+            seconds = 60
+        if seconds > 0:
+            self.__class__.spotify_blocked_until = max(
+                self.__class__.spotify_blocked_until,
+                time.time() + seconds,
+            )
+
+    def raise_if_spotify_blocked(self):
+        remaining = self.spotify_block_remaining()
+        if remaining > 0:
+            raise SpotifyBridgeError(429, "Spotify API blocked", str(remaining))
+
     def handle_get(self, path, query):
         if path == "/health":
-            return {"ok": True}
+            remaining = self.spotify_block_remaining()
+            return {
+                "ok": True,
+                "spotify_blocked": remaining > 0,
+                "retry_after": remaining,
+            }
+        self.raise_if_spotify_blocked()
         if path == "/startup":
             state = self.get_playback_state(max_age=10)
             track = state.get("item") if state else None
@@ -239,6 +268,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 return state
             except SpotifyBridgeError as e:
                 if e.status == 429 and cls.state_cache:
+                    self.set_spotify_block(e.retry_after)
                     print("Spotify rate limited playback state, using cached state")
                     return cls.state_cache
                 raise
@@ -281,7 +311,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return None
 
     def preload_current_album_art_soon(self, track):
-        if not self.presto_is_active():
+        if not self.presto_is_active() or self.spotify_block_remaining():
             return
         thread = threading.Thread(
             target=self.preload_current_album_art,
@@ -291,18 +321,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
         thread.start()
 
     def preload_current_album_art(self, track):
-        if not self.presto_is_active():
+        if not self.presto_is_active() or self.spotify_block_remaining():
             return
         try:
             for size in ALBUM_ART_PRELOAD_SIZES:
-                if not self.presto_is_active():
+                if not self.presto_is_active() or self.spotify_block_remaining():
                     return
                 self.preload_track_album_art(track, size)
         except Exception as e:
             print("Current album-art preload failed:", e)
 
     def preload_queue_album_art_soon(self, queue_response=None):
-        if not self.presto_is_active():
+        if not self.presto_is_active() or self.spotify_block_remaining():
             return
         if time.time() - self.__class__.last_queue_preload < QUEUE_PRELOAD_SECONDS:
             return
@@ -314,7 +344,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         thread.start()
 
     def preload_queue_album_art(self, force=False, queue_response=None):
-        if not self.presto_is_active():
+        if not self.presto_is_active() or self.spotify_block_remaining():
             return
         if not self.__class__.preload_lock.acquire(blocking=False):
             return
@@ -331,7 +361,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
             for track in tracks:
                 for size in ALBUM_ART_PRELOAD_SIZES:
-                    if not self.presto_is_active():
+                    if not self.presto_is_active() or self.spotify_block_remaining():
                         return
                     self.preload_track_album_art(track, size)
             self.__class__.last_queue_preload = time.time()
@@ -390,6 +420,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 path.unlink()
 
     def handle_post(self, path, query, body):
+        self.raise_if_spotify_blocked()
         if path == "/play":
             payload = {}
             if body.get("context_uri"):
