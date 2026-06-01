@@ -171,8 +171,8 @@ class Spotify(BaseApp):
             return
 
         nav_y = self.height - 48
-        left_bounds = (135, nav_y, 70, 45)
-        right_bounds = (self.width - 205, nav_y, 70, 45)
+        left_bounds = (245, nav_y, 70, 45)
+        right_bounds = (self.width - 80, nav_y, 70, 45)
         page_text = "{}/{}".format(page + 1, total_pages)
 
         try:
@@ -191,7 +191,7 @@ class Spotify(BaseApp):
             print("Menu nav icons not loaded:", e)
 
         self.display.set_pen(self.ui_gray_pen)
-        self.display.text(page_text, self.center_x - 12, nav_y + 13, scale=0.6)
+        self.display.text(page_text, left_bounds[0] - 42, nav_y + 13, scale=0.6)
 
     def render_speaker_screen(self):
         self.clear(1)
@@ -579,8 +579,7 @@ class Spotify(BaseApp):
         else:
             self.display.set_pen(self.bridge_unknown_pen)
             label = "Bridge Unknown"
-        text_x = (self.width - (len(label) * 8)) // 2
-        self.display.text(label, text_x, self.height - 24, scale=0.6)
+        self.display.text(label, 10, self.height - 24, scale=0.6)
 
     def render_search_results(self):
         """Draws track search results."""
