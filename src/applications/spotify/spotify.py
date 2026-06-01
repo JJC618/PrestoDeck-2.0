@@ -165,14 +165,20 @@ class Spotify(BaseApp):
             self.state.playback_fetch_at = time.time() + 2
             self.state.force_redraw = True
 
-    def draw_menu_nav(self, page, total_pages, zones):
+    def draw_menu_nav(self, page, total_pages, zones, align_right=False):
         zones.clear()
         if total_pages <= 1:
             return
 
         nav_y = self.height - 48
-        left_bounds = (245, nav_y, 70, 45)
-        right_bounds = (self.width - 80, nav_y, 70, 45)
+        if align_right:
+            left_bounds = (245, nav_y, 70, 45)
+            right_bounds = (self.width - 80, nav_y, 70, 45)
+            page_x = left_bounds[0] - 42
+        else:
+            left_bounds = (145, nav_y, 70, 45)
+            right_bounds = (self.width - 215, nav_y, 70, 45)
+            page_x = self.center_x - 12
         page_text = "{}/{}".format(page + 1, total_pages)
 
         try:
@@ -191,7 +197,7 @@ class Spotify(BaseApp):
             print("Menu nav icons not loaded:", e)
 
         self.display.set_pen(self.ui_gray_pen)
-        self.display.text(page_text, left_bounds[0] - 42, nav_y + 18, scale=0.6)
+        self.display.text(page_text, page_x, nav_y + 18, scale=0.6)
 
     def render_speaker_screen(self):
         self.clear(1)
@@ -918,7 +924,7 @@ class Spotify(BaseApp):
                 
                 self.playlist_zones.append((uri, (0, y_offset, self.width, row_height)))
                 y_offset += row_height
-            self.draw_menu_nav(self.state.playlist_page, total_pages, self.playlist_nav_zones)
+            self.draw_menu_nav(self.state.playlist_page, total_pages, self.playlist_nav_zones, align_right=True)
 
         self.presto.update()
 
