@@ -90,33 +90,18 @@ Fix:
 
 Check `secrets.py` on the Presto root and make sure the SSID and password match exactly, including spaces, capitals, and symbols.
 
-### `(secrets missing local)`
+### `(bridge url missing)`
 
-The Presto cannot find usable Spotify credentials in its local `secrets.py`.
-This only applies if `USE_SPOTIFY_BRIDGE = False`.
-
-Likely causes:
-
-- `secrets.py` is missing from the Presto root.
-- `secrets.py` was copied inside `src/` instead of the Presto root.
-- `SPOTIFY_CREDENTIALS` is missing or empty.
-
-Fix:
-
-Copy your private `src/secrets.py` to the Presto root so it sits beside `main.py`.
-
-### `(secrets missing bridge)`
-
-The Presto is set to use the Raspberry Pi bridge, but the bridge URL is missing from `secrets.py`.
+The Presto cannot find the Raspberry Pi bridge URL in `secrets.py`.
 
 Likely causes:
 
 - `SPOTIFY_BRIDGE_BASE_URL` is missing or blank in `secrets.py`.
-- `USE_SPOTIFY_BRIDGE = True`, but the bridge URL was not copied in.
+- `secrets.py` was copied inside `src/` instead of the Presto root.
 
 Fix:
 
-Set the bridge URL in the Presto `secrets.py` file:
+Copy your private `src/secrets.py` to the Presto root so it sits beside `main.py`, and set the bridge URL:
 
 ```python
 SPOTIFY_BRIDGE_BASE_URL = "http://YOUR_PI_IP:8787"
@@ -152,7 +137,7 @@ systemctl status presto-spotify-bridge
 ### `(spotify uri incorrect)`
 
 The Spotify credentials are missing required values, invalid, expired, or do not have the permissions the app needs.
-In the recommended bridge setup, these credentials are used by the Pi bridge.
+These credentials are used by the Pi bridge.
 
 Likely causes:
 
@@ -233,7 +218,6 @@ Do not print your password. Check the SSID is exact and the password length look
 Check `SPOTIFY_BRIDGE_BASE_URL` in `src/secrets.py`:
 
 ```python
-USE_SPOTIFY_BRIDGE = True
 SPOTIFY_BRIDGE_BASE_URL = "http://YOUR_PI_IP:8787"
 ```
 

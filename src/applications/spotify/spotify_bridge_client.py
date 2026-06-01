@@ -2,7 +2,7 @@ import ujson as json
 import urequests as requests
 import time
 
-from applications.spotify.spotify_client import quote, quote_plus
+from applications.spotify.spotify_url import quote, quote_plus
 
 
 class BridgeHttpError(Exception):

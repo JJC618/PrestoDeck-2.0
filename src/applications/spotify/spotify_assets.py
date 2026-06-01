@@ -2,7 +2,7 @@ import os
 import time
 import urequests as requests
 
-from applications.spotify.spotify_client import quote
+from applications.spotify.spotify_url import quote
 from applications.spotify.spotify_settings import (
     ALBUM_ART_CACHE_DIR,
     ALBUM_ART_CACHE_MAX_BYTES,
@@ -10,7 +10,6 @@ from applications.spotify.spotify_settings import (
     PRESTO_ALBUM_ART_CACHE_ENABLED,
     SPOTIFY_BRIDGE_BASE_URL,
     SD_ASSET_ROOTS,
-    USE_SPOTIFY_BRIDGE,
 )
 
 BRIDGE_IMAGE_RETRY_AT = 0
@@ -141,7 +140,7 @@ def get_cached_album_cover(track, size=250):
         return None
 
 
-def get_album_cover(track, size=250, allow_direct_fallback=True):
+def get_album_cover(track, size=250):
     """Fetches a resized album cover image, preferring cache or bridge."""
     cache_root = writable_cache_root()
     cache_path = cache_root + "/" + album_cache_key(track, size)
@@ -150,31 +149,11 @@ def get_album_cover(track, size=250, allow_direct_fallback=True):
     if img:
         return img
 
-    if USE_SPOTIFY_BRIDGE:
-        img = get_album_cover_from_bridge(track, size)
-        if img:
-            save_album_cover_to_cache(cache_root, cache_path, img, "Failed caching bridge image:")
-            return img
-        return None
-
-    images = track["album"]["images"]
-    image_index = 0 if size > 250 or len(images) == 1 else 1
-    img_url = images[image_index]["url"]
-    resize_url = f"https://wsrv.nl/?url={img_url}&w={size}&h={size}"
-
-    img = None
-    try:
-        response = requests.get(resize_url)
-        if response.status_code == 200:
-            img = response.content
-            save_album_cover_to_cache(cache_root, cache_path, img, "Failed caching image:")
-        else:
-            print("Failed to fetch image:", response.status_code)
-        response.close()
-    except Exception as e:
-        print("Fetch image error:", e)
-
-    return img
+    img = get_album_cover_from_bridge(track, size)
+    if img:
+        save_album_cover_to_cache(cache_root, cache_path, img, "Failed caching bridge image:")
+        return img
+    return None
 
 
 def get_album_cover_from_bridge(track, size):

@@ -1,6 +1,6 @@
 APP_ASSET_ROOT = "applications/spotify"
 SD_ASSET_ROOTS = ("/sd/applications/spotify", "/sd")
-APP_VERSION = "0.2.12"
+APP_VERSION = "0.3.0"
 
 try:
     import secrets as project_secrets
@@ -17,5 +17,4 @@ ALBUM_ART_CACHE_DIR = "cache/album_art"
 ALBUM_ART_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 PRESTO_ALBUM_ART_CACHE_ENABLED = False
 
-USE_SPOTIFY_BRIDGE = getattr(project_secrets, "USE_SPOTIFY_BRIDGE", True)
 SPOTIFY_BRIDGE_BASE_URL = getattr(project_secrets, "SPOTIFY_BRIDGE_BASE_URL", "http://192.168.1.100:8787")

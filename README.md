@@ -76,9 +76,9 @@ Edit `src/secrets.py` and set:
 - `WIFI_PASSWORD`
 - `SPOTIFY_BRIDGE_BASE_URL`
 
-For the recommended Raspberry Pi bridge setup, Spotify credentials are used by
-the Pi bridge. The Presto only needs WiFi and `SPOTIFY_BRIDGE_BASE_URL`; it does
-not fall back to local Spotify API calls when the bridge is unavailable.
+The Raspberry Pi bridge is required. Spotify credentials are used by the Pi
+bridge, and the Presto only contacts the bridge; it does not make local Spotify
+API calls.
 
 Example bridge URL:
 
@@ -216,6 +216,12 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.3.0
+
+- Made the Raspberry Pi bridge compulsory and removed the Presto local Spotify mode.
+- Renamed the missing bridge URL boot error and hardened album-art requests against old clients.
+- Removed obsolete Presto local Spotify API client code.
+
 ### 0.2.12
 
 - Show a clearer bridge unavailable boot error when the Raspberry Pi service cannot be reached.
@@ -226,8 +232,8 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ### 0.2.10
 
-- Removed Presto-side Spotify fallback calls when bridge mode is enabled.
-- Kept album-art fetching bridge-only in bridge mode so Spotify traffic is logged from one place.
+- Removed Presto-side Spotify fallback calls.
+- Kept album-art fetching bridge-only so Spotify traffic is logged from one place.
 
 ### 0.2.9
 

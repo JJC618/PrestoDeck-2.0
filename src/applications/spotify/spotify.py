@@ -4,8 +4,7 @@ import jpegdec
 import pngdec
 import uasyncio as asyncio
 from applications.spotify.spotify_assets import asset_path, file_exists, get_album_cover, get_cached_album_cover, mount_sd_card
-from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, SpotifyBridgeOnlyClient
-from applications.spotify.spotify_client import Session, SpotifyWebApiClient, SpotifyWebApiError
+from applications.spotify.spotify_bridge_client import BridgeHttpError, SpotifyBridgeClient, SpotifyBridgeOnlyClient
 from applications.spotify.spotify_controls import ControlButton
 from applications.spotify.spotify_settings import (
     APP_VERSION,
@@ -14,11 +13,9 @@ from applications.spotify.spotify_settings import (
     SD_ASSET_ROOTS,
     SPOTIFY_BRIDGE_BASE_URL,
     TOUCH_FETCH_GRACE,
-    USE_SPOTIFY_BRIDGE,
 )
 from applications.spotify.spotify_state import State
 from base import BaseApp
-import secrets
 
 
 class StartupError(Exception):
@@ -262,11 +259,17 @@ class Spotify(BaseApp):
         self.state.api_busy = True
         try:
             result = fetch_state(self.spotify_client, startup=True, raise_errors=True)
-        except SpotifyWebApiError:
-            raise StartupError("(spotify uri incorrect)")
+        except BridgeHttpError as e:
+            message = str(e).lower()
+            if e.status_code in (401, 403) or self.spotify_credentials_error(message):
+                raise StartupError("(spotify uri incorrect)")
+            if e.status_code == 502:
+                raise StartupError("(bridge unavailable)")
+            print("Failed preparing startup playback:", e)
+            result = None
         except Exception as e:
             message = str(e).lower()
-            if "401" in message or "403" in message or "invalid" in message or "scope" in message:
+            if self.spotify_credentials_error(message):
                 raise StartupError("(spotify uri incorrect)")
             print("Failed preparing startup playback:", e)
             result = None
@@ -357,35 +360,35 @@ class Spotify(BaseApp):
                 self.display.text("No Speakers Found", 25, y, scale=0.8)
         self.draw_menu_nav(self.state.device_page, total_pages, self.device_nav_zones)
         self.presto.update()
-            
+
+    def spotify_credentials_error(self, message):
+        terms = (
+            "401",
+            "403",
+            "invalid",
+            "scope",
+            "permission",
+            "refresh_token",
+            "client_id",
+            "client_secret",
+            "credentials",
+            "access token",
+            "token",
+        )
+        return any(term in message for term in terms)
+
     def get_spotify_client(self):
-        if USE_SPOTIFY_BRIDGE:
-            if not SPOTIFY_BRIDGE_BASE_URL:
-                raise StartupError("(secrets missing bridge)")
-            bridge_client = SpotifyBridgeClient(SPOTIFY_BRIDGE_BASE_URL)
-            try:
-                health = bridge_client.health()
-            except Exception:
-                raise StartupError("(bridge unavailable)")
-            bridge_version = health.get("bridge_version") if health else None
-            if bridge_version and bridge_version != APP_VERSION:
-                raise StartupError("(version mismatch)")
-            return SpotifyBridgeOnlyClient(bridge_client)
-
-        if not hasattr(secrets, 'SPOTIFY_CREDENTIALS') or not secrets.SPOTIFY_CREDENTIALS:
-            raise StartupError("(secrets missing local)")
-
-        required_keys = ("refresh_token", "client_id", "client_secret", "device_id")
-        for key in required_keys:
-            if key not in secrets.SPOTIFY_CREDENTIALS or not secrets.SPOTIFY_CREDENTIALS.get(key):
-                raise StartupError("(spotify uri incorrect)")
-
+        if not SPOTIFY_BRIDGE_BASE_URL:
+            raise StartupError("(bridge url missing)")
+        bridge_client = SpotifyBridgeClient(SPOTIFY_BRIDGE_BASE_URL)
         try:
-            session = Session(secrets.SPOTIFY_CREDENTIALS, lazy_token=False)
-            local_client = SpotifyWebApiClient(session)
+            health = bridge_client.health()
         except Exception:
-            raise StartupError("(spotify uri incorrect)")
-        return local_client
+            raise StartupError("(bridge unavailable)")
+        bridge_version = health.get("bridge_version") if health else None
+        if bridge_version and bridge_version != APP_VERSION:
+            raise StartupError("(version mismatch)")
+        return SpotifyBridgeOnlyClient(bridge_client)
         
     def setup_buttons(self):
         """Initializes control buttons and their behavior."""

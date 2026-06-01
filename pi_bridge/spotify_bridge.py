@@ -50,7 +50,7 @@ QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
-BRIDGE_VERSION = "0.2.12"
+BRIDGE_VERSION = "0.3.0"
 
 
 class SpotifyBridgeError(Exception):
@@ -311,7 +311,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if track_id and image_url:
             cache_path = self.album_art_cache_path_for_key(track_id, size)
         else:
-            state = self.get_playback_state(max_age=10)
+            state = self.__class__.state_cache
             track = state.get("item") if state else None
             if not track:
                 raise SpotifyBridgeError(404, "No current track")

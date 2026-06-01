@@ -22,10 +22,10 @@ src/secrets.example.py
 src/applications/spotify/spotify.py
 src/applications/spotify/spotify_assets.py
 src/applications/spotify/spotify_bridge_client.py
-src/applications/spotify/spotify_client.py
 src/applications/spotify/spotify_controls.py
 src/applications/spotify/spotify_settings.py
 src/applications/spotify/spotify_state.py
+src/applications/spotify/spotify_url.py
 pi_bridge/spotify_bridge.py
 pi_bridge/install_service.sh
 pi_bridge/presto-spotify-bridge.service
@@ -64,10 +64,10 @@ python3 -m py_compile \
   src/applications/spotify/spotify.py \
   src/applications/spotify/spotify_assets.py \
   src/applications/spotify/spotify_bridge_client.py \
-  src/applications/spotify/spotify_client.py \
   src/applications/spotify/spotify_controls.py \
   src/applications/spotify/spotify_settings.py \
   src/applications/spotify/spotify_state.py \
+  src/applications/spotify/spotify_url.py \
   src/base.py \
   src/main.py
 
