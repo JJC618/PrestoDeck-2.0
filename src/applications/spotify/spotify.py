@@ -33,7 +33,8 @@ class Spotify(BaseApp):
         try:
             icon = pngdec.PNG(self.display)
             icon.open_file(asset_path("icon.png"))
-            icon.decode(self.center_x - icon.get_width()//2, self.center_y - icon.get_height()//2 - 20)
+            icon_x, icon_y = self.centered_visual_position(icon.get_width(), icon.get_height(), y_offset=-20)
+            icon.decode(icon_x, icon_y)
             self.presto.update()
         except Exception as e:
             print("Startup icon not loaded:", e)
@@ -112,6 +113,19 @@ class Spotify(BaseApp):
     def centered_text_x(self, text, scale, container_width=None, container_x=0):
         width = self.width if container_width is None else container_width
         return container_x + max(0, (width - self.measure_text_width(text, scale)) // 2)
+
+    def centered_visual_x(self, visual_width, container_width=None, container_x=0):
+        width = self.width if container_width is None else container_width
+        return container_x + max(0, (width - visual_width) // 2)
+
+    def centered_visual_position(self, visual_width, visual_height, y_offset=0):
+        return (
+            self.centered_visual_x(visual_width),
+            max(0, (self.height - visual_height) // 2 + y_offset),
+        )
+
+    def centered_button_bounds(self, width, height, y):
+        return (self.centered_visual_x(width), y, width, height)
 
     def display_startup_message(self, text, error=None):
         self.clear(1)
@@ -472,7 +486,7 @@ class Spotify(BaseApp):
             ("Playlist", ["playlists.png"], (0, 0, 80, 80), handle_playlist_button, update_show_controls),
             ("Next", ["next.png"], (self.center_x + 60, self.height - 100, 80, 100), next_track, update_show_controls),
             ("Previous", ["previous.png"], (self.center_x - 140, self.height - 100, 80, 100), previous_track, update_show_controls),
-            ("Play", ["play.png", "pause.png"], (self.center_x - 40, self.height - 100, 80, 100), play_pause, update_play_pause),
+            ("Play", ["play.png", "pause.png"], self.centered_button_bounds(80, 100, self.height - 100), play_pause, update_play_pause),
             ("Toggle Shuffle", ["shuffle_on.png", "shuffle_off.png"], (self.center_x - 230, self.height - 100, 80, 100), toggle_shuffle, update_shuffle),
             ("Toggle Repeat", ["repeat_on.png", "repeat_on_1.png", "repeat_off.png"], (self.center_x + 150, self.height - 100, 80, 100), toggle_repeat, update_repeat),
             ("Volume Down", ["volume_down.png"], (20, 155, 60, 80), volume_down, update_volume_button),
@@ -1382,8 +1396,7 @@ class Spotify(BaseApp):
             self.j.open_RAM(memoryview(img))
 
             img_width, img_height = self.j.get_width(), self.j.get_height()
-            img_x = (self.width - img_width) // 2
-            img_y = ((self.height - img_height) // 2) - 60
+            img_x, img_y = self.centered_visual_position(img_width, img_height, y_offset=-60)
             self.album_art_bounds = (img_x, img_y, img_width, img_height)
 
             self.clear(0)
@@ -1401,8 +1414,7 @@ class Spotify(BaseApp):
             icon.open_file(asset_path("icon.png"))
             icon_width = icon.get_width()
             icon_height = icon.get_height()
-            icon_x = (self.width - icon_width) // 2
-            icon_y = (self.height - icon_height) // 2
+            icon_x, icon_y = self.centered_visual_position(icon_width, icon_height)
             if not fullscreen:
                 icon_y -= 60
                 self.album_art_bounds = (icon_x, icon_y, icon_width, icon_height)
