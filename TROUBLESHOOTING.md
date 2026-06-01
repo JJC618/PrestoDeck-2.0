@@ -58,7 +58,7 @@ print(repr(secrets.WIFI_SSID))
 print(len(secrets.WIFI_PASSWORD))
 ```
 
-Do not print your password on video. Check the SSID is exact and the password length looks right.
+Do not print your password. Check the SSID is exact and the password length looks right.
 
 ## Bridge Failed
 
