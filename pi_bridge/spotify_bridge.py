@@ -132,6 +132,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
     session = SpotifySession(project_secrets.SPOTIFY_CREDENTIALS)
     preload_lock = threading.Lock()
     last_queue_preload = 0
+    state_lock = threading.Lock()
+    state_cache = None
+    state_cache_at = 0
 
     def log_message(self, fmt, *args):
         print("{} - {}".format(self.address_string(), fmt % args))
@@ -161,16 +164,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path == "/health":
             return {"ok": True}
         if path == "/startup":
-            state = self.session.request("GET", "/me/player")
-            self.attach_liked_state(state)
+            state = self.get_playback_state(max_age=10)
             track = state.get("item") if state else None
             if track:
                 self.preload_current_album_art_soon(track)
-            self.preload_queue_album_art_soon()
             return state
         if path == "/state":
-            state = self.session.request("GET", "/me/player")
-            self.attach_liked_state(state)
+            state = self.get_playback_state(max_age=3)
             self.preload_queue_album_art_soon()
             return state
         if path == "/album-art/current":
@@ -207,6 +207,28 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return {"liked": self.track_is_liked(self.track_uri(track_id))}
         raise SpotifyBridgeError(404, "Unknown endpoint")
 
+    def get_playback_state(self, max_age=3):
+        cls = self.__class__
+        now = time.time()
+        if cls.state_cache and now - cls.state_cache_at < max_age:
+            return cls.state_cache
+
+        with cls.state_lock:
+            now = time.time()
+            if cls.state_cache and now - cls.state_cache_at < max_age:
+                return cls.state_cache
+            try:
+                state = self.session.request("GET", "/me/player")
+                self.attach_liked_state(state)
+                cls.state_cache = state
+                cls.state_cache_at = time.time()
+                return state
+            except SpotifyBridgeError as e:
+                if e.status == 429 and cls.state_cache:
+                    print("Spotify rate limited playback state, using cached state")
+                    return cls.state_cache
+                raise
+
     def attach_liked_state(self, state):
         track = state.get("item") if state else None
         track_uri = track.get("uri") if track else None
@@ -229,7 +251,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def send_current_album_art(self, query):
         size = int(query.get("size", ["250"])[0])
         size = max(64, min(640, size))
-        state = self.session.request("GET", "/me/player")
+        state = self.get_playback_state(max_age=10)
         track = state.get("item") if state else None
         if not track:
             raise SpotifyBridgeError(404, "No current track")
