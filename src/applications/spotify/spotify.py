@@ -191,7 +191,7 @@ class Spotify(BaseApp):
             print("Menu nav icons not loaded:", e)
 
         self.display.set_pen(self.ui_gray_pen)
-        self.display.text(page_text, left_bounds[0] - 42, nav_y + 13, scale=0.6)
+        self.display.text(page_text, left_bounds[0] - 42, nav_y + 18, scale=0.6)
 
     def render_speaker_screen(self):
         self.clear(1)
