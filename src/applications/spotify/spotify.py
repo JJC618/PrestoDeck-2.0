@@ -344,7 +344,10 @@ class Spotify(BaseApp):
             self.device_zones.append((dev_id, (0, y, self.width, row_height)))
             y += row_height
         if not self.state.devices_data:
-            self.display.text("No Speakers Found", 25, y, scale=0.8)
+            if self.spotify_api_blocked():
+                self.draw_api_blocked_results_message()
+            else:
+                self.display.text("No Speakers Found", 25, y, scale=0.8)
         self.draw_menu_nav(self.state.device_page, total_pages, self.device_nav_zones)
         self.presto.update()
             
@@ -741,6 +744,23 @@ class Spotify(BaseApp):
             label = "Bridge Unknown"
         self.display.text(label, 10, self.height - 24, scale=0.6)
 
+    def draw_api_blocked_results_message(self):
+        try:
+            self.display.set_font("bitmap8")
+        except Exception:
+            pass
+        self.display.set_pen(self.bridge_bad_pen)
+        scale = 1
+        lines = (
+            "(Spotify API blocked therefore results not loading.)",
+            "(Please see settings menu for timer.)",
+        )
+        y = self.height - 44
+        for line in lines:
+            self.display.text(line, self.centered_text_x(line, scale), y, scale=scale)
+            y += 20
+        self.display.set_font("sans")
+
     def spotify_api_blocked(self):
         if hasattr(self.spotify_client, "spotify_block_remaining"):
             return self.spotify_client.spotify_block_remaining() > 0
@@ -771,7 +791,7 @@ class Spotify(BaseApp):
         current_label = self.bridge_status_text()
         if current_label != previous_label or current_label != self.bridge_status_label:
             self.bridge_status_label = current_label
-            if self.state.menu_mode in (0, 1):
+            if self.state.menu_mode in (0, 1, 2, 5):
                 self.state.force_redraw = True
 
     def render_search_results(self):
@@ -794,7 +814,10 @@ class Spotify(BaseApp):
         y_offset = 95
         row_height = 50
         if not self.state.search_results:
-            self.display.text("No Results", 25, y_offset, scale=0.8)
+            if self.spotify_api_blocked():
+                self.draw_api_blocked_results_message()
+            else:
+                self.display.text("No Results", 25, y_offset, scale=0.8)
         else:
             for index, track in enumerate(self.state.search_results):
                 name = track.get("name", "")
