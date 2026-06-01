@@ -105,6 +105,8 @@ class Spotify(BaseApp):
         self.playlist_nav_zones = []
         self.queue_zones = []
         self.keyboard_zones = []
+        self.keyboard_last_action = None
+        self.keyboard_last_press_at = 0
         self.search_result_zones = []
         self.search_action_zones = []
         self.like_action_zones = []
@@ -1272,6 +1274,12 @@ class Spotify(BaseApp):
                     for action, bounds in self.keyboard_zones:
                         bx, by, bw, bh = bounds
                         if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
+                            now = time.time()
+                            if action == self.keyboard_last_action and now - self.keyboard_last_press_at < 0.12:
+                                hit_action = True
+                                break
+                            self.keyboard_last_action = action
+                            self.keyboard_last_press_at = now
                             hit_action = True
                             if action == "space":
                                 if self.state.search_query:
@@ -1302,9 +1310,8 @@ class Spotify(BaseApp):
                                     button.on_press(self)
                                     break
 
-                    while self.touch.state:
-                        self.touch.poll()
-                        await asyncio.sleep_ms(5)
+                    if not self.touch.state:
+                        self.keyboard_last_action = None
             elif self.state.menu_mode == 5:
                 if self.touch.state:
                     tx, ty = self.touch.x, self.touch.y
