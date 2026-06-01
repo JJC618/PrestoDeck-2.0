@@ -69,6 +69,7 @@ class Spotify(BaseApp):
         self.pending_art_track_id = None
         self.pending_art_fullscreen = False
         self.art_fetch_after = 0
+        self.pending_art_attempts = 0
         self.active_speaker_pen = self.display.create_pen(89, 188, 97)
         self.ui_gray_pen = self.display.create_pen(179, 179, 179)
         self.keyboard_key_pen = self.ui_gray_pen
@@ -1165,6 +1166,7 @@ class Spotify(BaseApp):
     def queue_album_art_refresh(self, track_id, fullscreen=False):
         self.pending_art_track_id = track_id
         self.pending_art_fullscreen = fullscreen
+        self.pending_art_attempts = 0
         self.art_fetch_after = time.time() + 1.5
         self.show_icon_placeholder(fullscreen=fullscreen)
 
@@ -1189,8 +1191,14 @@ class Spotify(BaseApp):
                 self.show_fullscreen_image(img)
             else:
                 self.show_image(img)
+            self.pending_art_track_id = None
+            return
         else:
             self.show_icon_placeholder(fullscreen=self.pending_art_fullscreen)
+            self.pending_art_attempts += 1
+            if self.pending_art_attempts < 5:
+                self.art_fetch_after = time.time() + 5
+                return
         self.pending_art_track_id = None
 
     def show_fullscreen_image(self, img):
