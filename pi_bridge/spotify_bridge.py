@@ -52,10 +52,11 @@ ALBUM_ART_PRELOAD_SIZES = (250, 480)
 
 
 class SpotifyBridgeError(Exception):
-    def __init__(self, status, message):
+    def __init__(self, status, message, retry_after=None):
         super().__init__(message)
         self.status = status
         self.message = message
+        self.retry_after = retry_after
 
 
 class SpotifySession:
@@ -123,7 +124,7 @@ class SpotifySession:
                 return json.loads(content.decode("utf-8"))
         except HTTPError as e:
             message = e.read().decode("utf-8", "ignore")
-            raise SpotifyBridgeError(e.code, message or e.reason)
+            raise SpotifyBridgeError(e.code, message or e.reason, e.headers.get("Retry-After"))
         except URLError as e:
             raise SpotifyBridgeError(502, str(e.reason))
 
@@ -156,7 +157,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 data = self.handle_post(parsed.path, query, self.read_json_body())
             self.send_json(data)
         except SpotifyBridgeError as e:
-            self.send_json({"error": e.message}, status=e.status)
+            payload = {"error": e.message}
+            if e.retry_after:
+                payload["retry_after"] = e.retry_after
+            self.send_json(payload, status=e.status, retry_after=e.retry_after)
         except Exception as e:
             self.send_json({"error": str(e)}, status=500)
 
@@ -446,13 +450,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length).decode("utf-8")
         return json.loads(raw) if raw else {}
 
-    def send_json(self, data, status=200):
+    def send_json(self, data, status=200, retry_after=None):
         if data is None:
             return
         payload = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
+        if retry_after:
+            self.send_header("Retry-After", str(retry_after))
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(payload)
