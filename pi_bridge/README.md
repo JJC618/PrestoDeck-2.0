@@ -39,6 +39,8 @@ curl http://YOUR_PI_IP:8787/health
 curl http://YOUR_PI_IP:8787/state
 ```
 
+The health response includes the bridge version, whether Spotify is rate-limited, and whether the Presto has contacted the bridge recently.
+
 ## Endpoints
 
 - `GET /health`

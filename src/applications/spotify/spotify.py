@@ -5,9 +5,10 @@ import pngdec
 import uasyncio as asyncio
 from applications.spotify.spotify_assets import asset_path, get_album_cover, mount_sd_card
 from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, SpotifyBridgeFallbackClient
-from applications.spotify.spotify_client import Session, SpotifyWebApiClient
+from applications.spotify.spotify_client import Session, SpotifyWebApiClient, SpotifyWebApiError
 from applications.spotify.spotify_controls import ControlButton
 from applications.spotify.spotify_settings import (
+    APP_VERSION,
     PLAYBACK_FETCH_INTERVAL,
     PLAYLIST_CACHE_SECONDS,
     SPOTIFY_BRIDGE_BASE_URL,
@@ -17,6 +18,11 @@ from applications.spotify.spotify_settings import (
 from applications.spotify.spotify_state import State
 from base import BaseApp
 import secrets
+
+
+class StartupError(Exception):
+    pass
+
 
 class Spotify(BaseApp):
     def __init__(self):
@@ -34,22 +40,28 @@ class Spotify(BaseApp):
 
         self.display.set_font("sans")
         self.display.set_layer(1)
+        self.startup_gray_pen = self.display.create_pen(179, 179, 179)
+        self.startup_error_pen = self.display.create_pen(255, 0, 0)
         startup_message_at = time.time()
-        self.display_text("Connecting to WIFI", (90, self.height - 80), thickness=2)
-        self.presto.update()
+        self.display_startup_message("Connecting to WIFI")
 
         self.presto.connect()
+        wifi_started_at = time.time()
         while not self.presto.wifi.isconnected():
-            self.clear(1)
-            self.display_text("Failed to connect to WIFI", (40, self.height - 80), thickness=2)
-            time.sleep(2)
+            if time.time() - wifi_started_at > 20:
+                self.halt_startup_error("Connecting to WIFI", "(wrong wifi password)")
+            self.display_startup_message("Connecting to WIFI")
+            time.sleep(0.5)
 
         self.wait_for_message_minimum(startup_message_at, 2)
         self.clear(1)
         startup_message_at = time.time()
-        self.display_text("Loading Spotify...", (90, self.height - 80), thickness=2)
-        self.state = State()
-        self.spotify_client = self.get_spotify_client()
+        self.display_startup_message("Loading Spotify...")
+        try:
+            self.state = State()
+            self.spotify_client = self.get_spotify_client()
+        except StartupError as e:
+            self.halt_startup_error("Loading Spotify...", str(e))
         self.wait_for_message_minimum(startup_message_at, 2)
         self.clear(1)
         self.presto.update()
@@ -69,6 +81,7 @@ class Spotify(BaseApp):
         self.playlists_fetched_at = 0
         self.bridge_status_next_at = 0
         self.bridge_status_label = None
+        self.album_art_retry_after = {}
         self.album_art_bounds = None
         self.pending_art_track_id = None
         self.pending_art_fullscreen = False
@@ -83,12 +96,36 @@ class Spotify(BaseApp):
         self.bridge_bad_pen = self.display.create_pen(255, 0, 0)
         self.bridge_unknown_pen = self.ui_gray_pen
         self.setup_buttons()
-        self.prepare_startup_playback()
+        try:
+            self.prepare_startup_playback()
+        except StartupError as e:
+            self.halt_startup_error("Loading Spotify...", str(e))
 
     def wait_for_message_minimum(self, started_at, seconds):
         remaining = seconds - (time.time() - started_at)
         if remaining > 0:
             time.sleep(remaining)
+
+    def startup_text_x(self, text, scale):
+        return max(0, (self.width - int(len(text) * 8 * scale)) // 2)
+
+    def display_startup_message(self, text, error=None):
+        self.clear(1)
+        self.display.set_pen(self.ui_gray_pen if hasattr(self, "ui_gray_pen") else self.startup_gray_pen)
+        version = "PrestoDeck {}".format(APP_VERSION)
+        self.display.text(version, self.startup_text_x(version, 0.6), 12, scale=0.6)
+        self.display.set_pen(self.colors.WHITE)
+        self.display.set_thickness(2)
+        self.display.text(text, self.startup_text_x(text, 1.0), self.height - 80, scale=1.0)
+        if error:
+            self.display.set_pen(self.bridge_bad_pen if hasattr(self, "bridge_bad_pen") else self.startup_error_pen)
+            self.display.text(error, self.startup_text_x(error, 0.8), self.height - 50, scale=0.8)
+        self.presto.update()
+
+    def halt_startup_error(self, text, error):
+        while True:
+            self.display_startup_message(text, error)
+            time.sleep(2)
 
     def display_text(self, text, position, color=65535, scale=1, thickness=None):
         if thickness:
@@ -153,10 +190,21 @@ class Spotify(BaseApp):
             self.state.playback_fetch_track_id = None
 
     def prepare_startup_playback(self):
-        result = self.run_api_action(
-            lambda: fetch_state(self.spotify_client, startup=True),
-            "Failed preparing startup playback:",
-        )
+        if self.state.api_busy:
+            return
+        self.state.api_busy = True
+        try:
+            result = fetch_state(self.spotify_client, startup=True, raise_errors=True)
+        except SpotifyWebApiError:
+            raise StartupError("(spotify uri incorrect)")
+        except Exception as e:
+            message = str(e).lower()
+            if "401" in message or "403" in message or "invalid" in message or "scope" in message:
+                raise StartupError("(spotify uri incorrect)")
+            print("Failed preparing startup playback:", e)
+            result = None
+        finally:
+            self.state.api_busy = False
         if result:
             self.apply_playback_result(result)
             self.state.latest_fetch = time.time()
@@ -239,17 +287,27 @@ class Spotify(BaseApp):
             
     def get_spotify_client(self):
         if not hasattr(secrets, 'SPOTIFY_CREDENTIALS') or not secrets.SPOTIFY_CREDENTIALS:
-            while True:
-                self.clear(1)
-                self.display.set_pen(self.colors.WHITE)
-                self.display.text("Spotify credentials not found", 40, self.height - 80, scale=.9)
-                self.presto.update()
-                time.sleep(2)
+            raise StartupError("(secrets missing local)")
 
-        session = Session(secrets.SPOTIFY_CREDENTIALS, lazy_token=USE_SPOTIFY_BRIDGE)
-        local_client = SpotifyWebApiClient(session)
+        required_keys = ("refresh_token", "client_id", "client_secret", "device_id")
+        for key in required_keys:
+            if key not in secrets.SPOTIFY_CREDENTIALS or not secrets.SPOTIFY_CREDENTIALS.get(key):
+                raise StartupError("(spotify uri incorrect)")
+
+        try:
+            session = Session(secrets.SPOTIFY_CREDENTIALS, lazy_token=USE_SPOTIFY_BRIDGE)
+            local_client = SpotifyWebApiClient(session)
+        except Exception:
+            raise StartupError("(spotify uri incorrect)")
+
         if USE_SPOTIFY_BRIDGE:
+            if not SPOTIFY_BRIDGE_BASE_URL:
+                raise StartupError("(secrets missing bridge)")
             bridge_client = SpotifyBridgeClient(SPOTIFY_BRIDGE_BASE_URL)
+            try:
+                bridge_client.health()
+            except Exception:
+                raise StartupError("(secrets missing bridge)")
             return SpotifyBridgeFallbackClient(bridge_client, local_client)
         return local_client
         
@@ -279,7 +337,11 @@ class Spotify(BaseApp):
                 button.icon = "repeat_off.png"
 
         def update_volume_button(state, button):
-            button.enabled = state.menu_mode == 0 and not state.volume_buttons_hidden
+            button.enabled = (
+                state.menu_mode == 0 and
+                not state.volume_buttons_hidden and
+                not self.spotify_api_blocked()
+            )
 
         def update_like_button(state, button):
             button.enabled = state.menu_mode == 0 and state.track is not None
@@ -533,6 +595,9 @@ class Spotify(BaseApp):
 
     def adjust_volume(self, delta):
         """Changes the active Spotify device volume by the requested percentage."""
+        if self.spotify_api_blocked():
+            self.state.force_redraw = True
+            return
         volume = max(0, min(100, self.state.volume_percent + delta))
         try:
             self.spotify_client.set_volume(volume)
@@ -543,6 +608,17 @@ class Spotify(BaseApp):
         self.state.force_redraw = True
 
     def draw_volume_overlay(self):
+        if self.spotify_api_blocked():
+            x = 115
+            y = 18
+            width = 250
+            height = 30
+            label = "Spotify API Blocked"
+            self.display.set_pen(self.colors._BLACK)
+            self.display.rectangle(x, y, width, height)
+            self.display.set_pen(self.bridge_bad_pen)
+            self.display.text(label, self.startup_text_x(label, 0.7), y + 8, scale=0.7)
+            return
         if time.time() > self.state.volume_overlay_until:
             return
         x = 115
@@ -598,6 +674,11 @@ class Spotify(BaseApp):
             label = "Bridge Unknown"
         self.display.text(label, 10, self.height - 24, scale=0.6)
 
+    def spotify_api_blocked(self):
+        if hasattr(self.spotify_client, "spotify_block_remaining"):
+            return self.spotify_client.spotify_block_remaining() > 0
+        return False
+
     def bridge_status_text(self):
         block_remaining = 0
         if hasattr(self.spotify_client, "spotify_block_remaining"):
@@ -623,7 +704,7 @@ class Spotify(BaseApp):
         current_label = self.bridge_status_text()
         if current_label != previous_label or current_label != self.bridge_status_label:
             self.bridge_status_label = current_label
-            if self.state.menu_mode == 1:
+            if self.state.menu_mode in (0, 1):
                 self.state.force_redraw = True
 
     def render_search_results(self):
@@ -1331,6 +1412,12 @@ class Spotify(BaseApp):
             print("Failed to load icon placeholder:", e)
 
     def queue_album_art_refresh(self, track_id, fullscreen=False):
+        size = 480 if fullscreen else 250
+        retry_key = "{}_{}".format(track_id, size)
+        if time.time() < self.album_art_retry_after.get(retry_key, 0):
+            self.pending_art_track_id = None
+            self.show_icon_placeholder(fullscreen=fullscreen)
+            return
         self.pending_art_track_id = track_id
         self.pending_art_fullscreen = fullscreen
         self.pending_art_attempts = 0
@@ -1366,6 +1453,8 @@ class Spotify(BaseApp):
             if self.pending_art_attempts < 5:
                 self.art_fetch_after = time.time() + 5
                 return
+            retry_key = "{}_{}".format(track_id, size)
+            self.album_art_retry_after[retry_key] = time.time() + 60
         self.pending_art_track_id = None
 
     def show_fullscreen_image(self, img):
@@ -1635,7 +1724,7 @@ class Spotify(BaseApp):
             gc.collect()
             await asyncio.sleep_ms(200)
 
-def fetch_state(spotify_client, startup=False):
+def fetch_state(spotify_client, startup=False, raise_errors=False):
     """Fetches the current playback state from Spotify."""
     current_track = None
     is_playing = False
@@ -1664,6 +1753,8 @@ def fetch_state(spotify_client, startup=False):
             print("Got current playing track: " + current_track.get("name"))
     except Exception as e:
         print("Failed to get current playing track:", e)
+        if raise_errors:
+            raise
 
     if not current_track:
         try:
@@ -1674,6 +1765,8 @@ def fetch_state(spotify_client, startup=False):
                 print("Got recently playing track: " + current_track.get("name"))
         except Exception as e:
             print("Failed to get recently played track:", e)
+            if raise_errors:
+                raise
 
     if not current_track:
         return None

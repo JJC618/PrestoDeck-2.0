@@ -50,6 +50,7 @@ QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
+BRIDGE_VERSION = "0.2.0"
 
 
 class SpotifyBridgeError(Exception):
@@ -200,10 +201,20 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def handle_get(self, path, query):
         if path == "/health":
             remaining = self.spotify_block_remaining()
+            now = time.time()
             return {
                 "ok": True,
+                "bridge_version": BRIDGE_VERSION,
+                "server_time": int(now),
+                "last_bridge_check": int(now),
                 "spotify_blocked": remaining > 0,
                 "retry_after": remaining,
+                "presto_active": self.presto_is_active(),
+                "presto_active_for": max(0, int(self.__class__.presto_active_until - now)),
+                "last_state_age": (
+                    int(now - self.__class__.state_cache_at)
+                    if self.__class__.state_cache_at else None
+                ),
             }
         self.raise_if_spotify_blocked()
         if path == "/startup":
