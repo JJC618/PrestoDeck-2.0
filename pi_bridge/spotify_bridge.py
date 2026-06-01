@@ -48,6 +48,7 @@ ALBUM_ART_CACHE = ROOT / "cache" / "album_art"
 ALBUM_ART_CACHE_MAX_BYTES = 1024 * 1024 * 1024
 QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
+PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
 
 
@@ -136,6 +137,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
     state_lock = threading.Lock()
     state_cache = None
     state_cache_at = 0
+    presto_active_until = 0
 
     def log_message(self, fmt, *args):
         print("{} - {}".format(self.address_string(), fmt % args))
@@ -149,6 +151,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def handle_request(self, method):
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
+        self.mark_presto_active(parsed.path)
 
         try:
             if method == "GET":
@@ -163,6 +166,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self.send_json(payload, status=e.status, retry_after=e.retry_after)
         except Exception as e:
             self.send_json({"error": str(e)}, status=500)
+
+    def mark_presto_active(self, path):
+        if path != "/health":
+            self.__class__.presto_active_until = time.time() + PRESTO_ACTIVE_SECONDS
+
+    def presto_is_active(self):
+        return time.time() < self.__class__.presto_active_until
 
     def handle_get(self, path, query):
         if path == "/health":
@@ -271,6 +281,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return None
 
     def preload_current_album_art_soon(self, track):
+        if not self.presto_is_active():
+            return
         thread = threading.Thread(
             target=self.preload_current_album_art,
             args=(track,),
@@ -279,13 +291,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
         thread.start()
 
     def preload_current_album_art(self, track):
+        if not self.presto_is_active():
+            return
         try:
             for size in ALBUM_ART_PRELOAD_SIZES:
+                if not self.presto_is_active():
+                    return
                 self.preload_track_album_art(track, size)
         except Exception as e:
             print("Current album-art preload failed:", e)
 
     def preload_queue_album_art_soon(self, queue_response=None):
+        if not self.presto_is_active():
+            return
         if time.time() - self.__class__.last_queue_preload < QUEUE_PRELOAD_SECONDS:
             return
         thread = threading.Thread(
@@ -296,6 +314,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         thread.start()
 
     def preload_queue_album_art(self, force=False, queue_response=None):
+        if not self.presto_is_active():
+            return
         if not self.__class__.preload_lock.acquire(blocking=False):
             return
         try:
@@ -311,6 +331,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
             for track in tracks:
                 for size in ALBUM_ART_PRELOAD_SIZES:
+                    if not self.presto_is_active():
+                        return
                     self.preload_track_album_art(track, size)
             self.__class__.last_queue_preload = time.time()
         except Exception as e:
