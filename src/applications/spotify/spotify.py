@@ -79,6 +79,7 @@ class Spotify(BaseApp):
         self.bridge_bad_pen = self.display.create_pen(255, 0, 0)
         self.bridge_unknown_pen = self.ui_gray_pen
         self.setup_buttons()
+        self.prepare_startup_playback()
 
     def wait_for_message_minimum(self, started_at, seconds):
         remaining = seconds - (time.time() - started_at)
@@ -111,6 +112,49 @@ class Spotify(BaseApp):
             return None
         finally:
             self.state.api_busy = False
+
+    def apply_playback_result(self, result, previous_requested_track_id=None):
+        if not result:
+            return
+
+        device_id, track, is_playing, shuffle, repeat, prog, dur, volume, liked = result
+        if device_id:
+            self.spotify_client.session.device_id = device_id
+
+        self.state.track = track
+        self.state.is_playing = is_playing
+        self.state.shuffle = shuffle
+        self.state.repeat = repeat
+        self.state.progress_ms = prog
+        self.state.duration_ms = dur
+        if volume is not None:
+            self.state.volume_percent = volume
+        self.state.track_liked = liked
+        self.state.last_progress_update = time.time()
+
+        current_track_id = (track or {}).get("id")
+        if (
+            previous_requested_track_id and
+            current_track_id == previous_requested_track_id and
+            self.state.playback_fetch_until and
+            time.time() < self.state.playback_fetch_until
+        ):
+            self.state.playback_fetch_at = time.time() + 1
+        else:
+            self.state.playback_fetch_until = None
+            self.state.playback_fetch_track_id = None
+
+    def prepare_startup_playback(self):
+        result = self.run_api_action(
+            lambda: fetch_state(self.spotify_client, startup=True),
+            "Failed preparing startup playback:",
+        )
+        if result:
+            self.apply_playback_result(result)
+            self.state.latest_fetch = time.time()
+            if self.state.track:
+                self.queue_album_art_refresh(self.state.track.get("id"))
+                self.art_fetch_after = time.time() + 0.5
 
     def render_speaker_screen(self):
         self.clear(1)
@@ -1367,32 +1411,7 @@ class Spotify(BaseApp):
                         "Failed fetching playback state:",
                     )
                     if result:
-                        device_id, track, is_playing, shuffle, repeat, prog, dur, volume, liked = result
-                        if device_id:
-                            self.spotify_client.session.device_id = device_id
-                        
-                        self.state.track = track
-                        self.state.is_playing = is_playing
-                        self.state.shuffle = shuffle
-                        self.state.repeat = repeat
-                        self.state.progress_ms = prog
-                        self.state.duration_ms = dur
-                        if volume is not None:
-                            self.state.volume_percent = volume
-                        self.state.track_liked = liked
-                        self.state.last_progress_update = time.time()
-
-                        current_track_id = (track or {}).get("id")
-                        if (
-                            previous_requested_track_id and
-                            current_track_id == previous_requested_track_id and
-                            self.state.playback_fetch_until and
-                            time.time() < self.state.playback_fetch_until
-                        ):
-                            self.state.playback_fetch_at = time.time() + 1
-                        else:
-                            self.state.playback_fetch_until = None
-                            self.state.playback_fetch_track_id = None
+                        self.apply_playback_result(result, previous_requested_track_id)
 
                 await asyncio.sleep(0)
 
@@ -1477,7 +1496,7 @@ class Spotify(BaseApp):
             gc.collect()
             await asyncio.sleep_ms(200)
 
-def fetch_state(spotify_client):
+def fetch_state(spotify_client, startup=False):
     """Fetches the current playback state from Spotify."""
     current_track = None
     is_playing = False
@@ -1489,7 +1508,10 @@ def fetch_state(spotify_client):
     volume_percent = None
     track_liked = False
     try:
-        resp = spotify_client.current_playing()
+        if startup and hasattr(spotify_client, "startup_state"):
+            resp = spotify_client.startup_state()
+        else:
+            resp = spotify_client.current_playing()
         if resp and resp.get("item"):
             current_track = resp["item"]
             is_playing = resp.get("is_playing")

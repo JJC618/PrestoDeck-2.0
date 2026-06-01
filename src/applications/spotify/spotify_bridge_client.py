@@ -18,6 +18,9 @@ class SpotifyBridgeClient:
     def devices(self):
         return self.get("/devices")
 
+    def startup_state(self):
+        return self.get("/startup")
+
     def transfer_playback(self, device_id):
         self.session.device_id = device_id
         return self.post("/device/select", {"device_id": device_id})
@@ -115,6 +118,21 @@ class SpotifyBridgeFallbackClient:
 
     def devices(self):
         return self.call("devices")
+
+    def startup_state(self):
+        try:
+            result = self.bridge_client.startup_state()
+            self.session = self.bridge_client.session
+            self.bridge_retry_at = 0
+            self.bridge_available = True
+            return result
+        except Exception as e:
+            print("Bridge startup unavailable, using local Spotify API:", e)
+            self.bridge_retry_at = time.time() + 30
+            self.bridge_available = False
+            result = self.local_client.current_playing()
+            self.session = self.local_client.session
+            return result
 
     def transfer_playback(self, device_id):
         result = self.call("transfer_playback", device_id)

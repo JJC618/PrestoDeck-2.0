@@ -160,6 +160,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def handle_get(self, path, query):
         if path == "/health":
             return {"ok": True}
+        if path == "/startup":
+            state = self.session.request("GET", "/me/player")
+            self.attach_liked_state(state)
+            track = state.get("item") if state else None
+            if track:
+                for size in ALBUM_ART_PRELOAD_SIZES:
+                    self.preload_track_album_art(track, size)
+            self.preload_queue_album_art_soon()
+            return state
         if path == "/state":
             state = self.session.request("GET", "/me/player")
             self.attach_liked_state(state)
