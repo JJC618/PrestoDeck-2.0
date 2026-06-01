@@ -213,6 +213,11 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.2.9
+
+- Reduced idle Spotify API usage by polling playback every 60 seconds.
+- Stopped automatic queue preloading from normal playback state refreshes.
+
 ### 0.2.8
 
 - Limited album-art network fetching to one request per track and reused local cached art for fullscreen redraws.

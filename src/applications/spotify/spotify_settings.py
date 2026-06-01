@@ -1,13 +1,13 @@
 APP_ASSET_ROOT = "applications/spotify"
 SD_ASSET_ROOTS = ("/sd/applications/spotify", "/sd")
-APP_VERSION = "0.2.8"
+APP_VERSION = "0.2.9"
 
 try:
     import secrets as project_secrets
 except Exception:
     project_secrets = None
 
-PLAYBACK_FETCH_INTERVAL = 20
+PLAYBACK_FETCH_INTERVAL = 60
 TOUCH_FETCH_GRACE = 2
 PLAYLIST_CACHE_SECONDS = 300
 
