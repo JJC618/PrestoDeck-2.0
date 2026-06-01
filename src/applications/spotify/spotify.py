@@ -3,7 +3,7 @@ import time
 import jpegdec
 import pngdec
 import uasyncio as asyncio
-from applications.spotify.spotify_assets import asset_path, file_exists, get_album_cover, mount_sd_card
+from applications.spotify.spotify_assets import asset_path, file_exists, get_album_cover, get_cached_album_cover, mount_sd_card
 from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, SpotifyBridgeFallbackClient
 from applications.spotify.spotify_client import Session, SpotifyWebApiClient, SpotifyWebApiError
 from applications.spotify.spotify_controls import ControlButton
@@ -117,6 +117,8 @@ class Spotify(BaseApp):
         self.bridge_status_next_at = 0
         self.bridge_status_label = None
         self.album_art_retry_after = {}
+        self.album_art_fetched_tracks = {}
+        self.album_art_requested_tracks = {}
         self.album_art_bounds = None
         self.pending_art_track_id = None
         self.pending_art_fullscreen = False
@@ -1511,14 +1513,17 @@ class Spotify(BaseApp):
             print("Failed to load icon placeholder:", e)
 
     def queue_album_art_refresh(self, track_id, fullscreen=False):
-        size = 480 if fullscreen else 250
+        size = 250
         retry_key = "{}_{}".format(track_id, size)
+        if self.album_art_requested_tracks.get(retry_key):
+            self.pending_art_track_id = None
+            return
         if time.time() < self.album_art_retry_after.get(retry_key, 0):
             self.pending_art_track_id = None
             self.show_icon_placeholder(fullscreen=fullscreen)
             return
         self.pending_art_track_id = track_id
-        self.pending_art_fullscreen = fullscreen
+        self.pending_art_fullscreen = False
         self.pending_art_attempts = 0
         self.art_fetch_after = time.time() + 1.5
         self.show_icon_placeholder(fullscreen=fullscreen)
@@ -1537,23 +1542,17 @@ class Spotify(BaseApp):
             self.pending_art_track_id = None
             return
 
-        size = 480 if self.pending_art_fullscreen else 250
+        size = 250
+        retry_key = "{}_{}".format(track_id, size)
+        self.album_art_requested_tracks[retry_key] = True
         img = get_album_cover(self.state.track, size)
         if img:
-            if self.pending_art_fullscreen:
-                self.show_fullscreen_image(img)
-            else:
-                self.show_image(img)
+            self.show_image(img)
+            self.album_art_fetched_tracks[retry_key] = True
             self.pending_art_track_id = None
             return
         else:
             self.show_icon_placeholder(fullscreen=self.pending_art_fullscreen)
-            self.pending_art_attempts += 1
-            if self.pending_art_attempts < 5:
-                self.art_fetch_after = time.time() + 5
-                return
-            retry_key = "{}_{}".format(track_id, size)
-            self.album_art_retry_after[retry_key] = time.time() + 60
         self.pending_art_track_id = None
 
     def show_fullscreen_image(self, img):
@@ -1758,7 +1757,7 @@ class Spotify(BaseApp):
                 if self.state.track and not self.state.fullscreen_art and time.time() - self.state.last_touch_time > 30:
                     self.state.fullscreen_art = True
                     self.state.force_redraw = False
-                    img = get_album_cover(self.state.track, 480)
+                    img = get_cached_album_cover(self.state.track, 480) or get_cached_album_cover(self.state.track, 250)
                     if img:
                         self.show_fullscreen_image(img)
                     else:
@@ -1770,7 +1769,10 @@ class Spotify(BaseApp):
                 if self.state.fullscreen_art:
                     progress_bucket = int(self.state.get_current_progress() // 5000) if self.state.duration_ms else -1
                     if progress_bucket != self.state.fullscreen_progress_bucket:
-                        img = get_album_cover(self.state.track, 480) if self.state.track else None
+                        img = (
+                            get_cached_album_cover(self.state.track, 480) or
+                            get_cached_album_cover(self.state.track, 250)
+                        ) if self.state.track else None
                         if img:
                             self.show_fullscreen_image(img)
                         else:
@@ -1779,7 +1781,7 @@ class Spotify(BaseApp):
                     if prev_state != self.state or self.state.force_redraw:
                         self.state.force_redraw = False
                         if self.state.track:
-                            img = get_album_cover(self.state.track, 480)
+                            img = get_cached_album_cover(self.state.track, 480) or get_cached_album_cover(self.state.track, 250)
                             if img:
                                 self.show_fullscreen_image(img)
                             else:

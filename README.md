@@ -213,6 +213,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.2.8
+
+- Limited album-art network fetching to one request per track and reused local cached art for fullscreen redraws.
+
 ### 0.2.7
 
 - Reduced Spotify API calls by letting album-art requests use the already-known track image instead of refreshing playback state.

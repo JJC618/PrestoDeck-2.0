@@ -131,16 +131,24 @@ def album_cache_key(track, size):
     return "{}_{}.jpg".format(key, size)
 
 
+def get_cached_album_cover(track, size=250):
+    cache_root = writable_cache_root()
+    cache_path = cache_root + "/" + album_cache_key(track, size)
+    try:
+        with open(cache_path, "rb") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
 def get_album_cover(track, size=250, allow_direct_fallback=True):
     """Fetches a resized album cover image, preferring cache or bridge."""
     cache_root = writable_cache_root()
     cache_path = cache_root + "/" + album_cache_key(track, size)
 
-    try:
-        with open(cache_path, "rb") as f:
-            return f.read()
-    except OSError:
-        pass
+    img = get_cached_album_cover(track, size)
+    if img:
+        return img
 
     if USE_SPOTIFY_BRIDGE:
         img = get_album_cover_from_bridge(track, size)
