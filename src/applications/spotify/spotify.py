@@ -107,7 +107,11 @@ class Spotify(BaseApp):
             time.sleep(remaining)
 
     def startup_text_x(self, text, scale):
-        return max(0, (self.width - int(len(text) * 8 * scale)) // 2)
+        return self.centered_text_x(text, scale)
+
+    def centered_text_x(self, text, scale, container_width=None, container_x=0):
+        width = self.width if container_width is None else container_width
+        return container_x + max(0, (width - self.measure_text_width(text, scale)) // 2)
 
     def display_startup_message(self, text, error=None):
         self.clear(1)
@@ -617,7 +621,8 @@ class Spotify(BaseApp):
             self.display.set_pen(self.colors._BLACK)
             self.display.rectangle(x, y, width, height)
             self.display.set_pen(self.bridge_bad_pen)
-            self.display.text(label, self.startup_text_x(label, 0.7), y + 8, scale=0.7)
+            text_x = self.centered_text_x(label, 0.7, container_width=width, container_x=x)
+            self.display.text(label, text_x, y + 8, scale=0.7)
             return
         if time.time() > self.state.volume_overlay_until:
             return
@@ -1543,9 +1548,12 @@ class Spotify(BaseApp):
             return
 
         if not self.state.track:
+            if self.spotify_api_blocked():
+                return
             self.display.set_thickness(2)
             self.display.set_pen(self.ui_gray_pen)
-            self.display.text("Loading Spotify...", 130, self.height - 125, scale=0.8)
+            label = "Loading Spotify..."
+            self.display.text(label, self.centered_text_x(label, 0.8), self.height - 125, scale=0.8)
             return
 
         self.display.set_thickness(3)
