@@ -35,6 +35,122 @@ Watch bridge logs:
 journalctl -u presto-spotify-bridge -f
 ```
 
+## Red Boot Error Messages
+
+The Presto stops on red boot errors because continuing would usually leave the app half-loaded.
+
+### `(sd card mount failed)`
+
+The Presto could not mount the SD card.
+
+Likely causes:
+
+- The SD card is not inserted fully.
+- The SD card is not formatted as FAT32.
+- The SD card has a partition/layout the Presto cannot read.
+- The SD card reader or card is faulty.
+
+Fix:
+
+Format the SD card as FAT32, copy the contents of the repo `sd_card` folder back onto it, eject it cleanly, then reboot the Presto.
+
+### `(icons missing sd)`
+
+The SD card mounted, but one or more required image files were not found.
+
+Likely causes:
+
+- The `icons` folder was not copied to the SD card.
+- Files were copied inside an extra folder instead of the SD card root.
+- One of the icon filenames was changed.
+
+Fix:
+
+The SD card root should look like this:
+
+```text
+icon.png
+icons/
+```
+
+The `icons` folder must contain files such as `play.png`, `pause.png`, `speaker.png`, `search.png`, `left_arrow.png`, and `right_arrow.png`.
+
+### `(wrong wifi password)`
+
+The Presto could not connect to WiFi within the startup timeout.
+
+Likely causes:
+
+- `WIFI_SSID` is wrong.
+- `WIFI_PASSWORD` is wrong.
+- The WiFi network is out of range.
+- The router is not accepting the device.
+
+Fix:
+
+Check `secrets.py` on the Presto root and make sure the SSID and password match exactly, including spaces, capitals, and symbols.
+
+### `(secrets missing local)`
+
+The Presto cannot find usable Spotify credentials in its local `secrets.py`.
+
+Likely causes:
+
+- `secrets.py` is missing from the Presto root.
+- `secrets.py` was copied inside `src/` instead of the Presto root.
+- `SPOTIFY_CREDENTIALS` is missing or empty.
+
+Fix:
+
+Copy your private `src/secrets.py` to the Presto root so it sits beside `main.py`.
+
+### `(secrets missing bridge)`
+
+The Presto is set to use the Raspberry Pi bridge, but it cannot contact it.
+
+Likely causes:
+
+- `SPOTIFY_BRIDGE_BASE_URL` is missing or wrong in `secrets.py`.
+- The Pi bridge service is not running.
+- The Pi has a different IP address.
+- The Pi bridge files or Pi-side `src/secrets.py` are missing.
+
+Fix:
+
+From your computer, test:
+
+```bash
+curl http://YOUR_PI_IP:8787/health
+```
+
+If that fails, SSH into the Pi and restart/check the service:
+
+```bash
+sudo systemctl restart presto-spotify-bridge
+systemctl status presto-spotify-bridge
+```
+
+### `(spotify uri incorrect)`
+
+The Spotify credentials are missing required values, invalid, expired, or do not have the permissions the app needs.
+
+Likely causes:
+
+- The generated `SPOTIFY_CREDENTIALS` block was copied incorrectly.
+- The Spotify app client ID or client secret is wrong.
+- The refresh token is invalid.
+- The token was generated without the required scopes.
+
+Fix:
+
+Run the token helper again:
+
+```bash
+python3 adhoc/generate_token.py
+```
+
+Copy the new `SPOTIFY_CREDENTIALS` block into `src/secrets.py`, then upload that file to both the Presto and the Pi.
+
 ## Presto Stuck On Connecting To WiFi
 
 This usually means `secrets.py` is missing or the WiFi details are wrong.
@@ -200,7 +316,7 @@ The app also checks:
 /applications/spotify/icons/*.png
 ```
 
-If icons are missing, the app should still run, but buttons may appear blank.
+If icons are missing on current versions, the app will stop at boot with `(icons missing sd)` so the problem is visible immediately.
 
 ## Raspberry Pi Service Not Installed
 

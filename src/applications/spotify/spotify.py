@@ -3,7 +3,7 @@ import time
 import jpegdec
 import pngdec
 import uasyncio as asyncio
-from applications.spotify.spotify_assets import asset_path, get_album_cover, mount_sd_card
+from applications.spotify.spotify_assets import asset_path, file_exists, get_album_cover, mount_sd_card
 from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, SpotifyBridgeFallbackClient
 from applications.spotify.spotify_client import Session, SpotifyWebApiClient, SpotifyWebApiError
 from applications.spotify.spotify_controls import ControlButton
@@ -11,6 +11,7 @@ from applications.spotify.spotify_settings import (
     APP_VERSION,
     PLAYBACK_FETCH_INTERVAL,
     PLAYLIST_CACHE_SECONDS,
+    SD_ASSET_ROOTS,
     SPOTIFY_BRIDGE_BASE_URL,
     TOUCH_FETCH_GRACE,
     USE_SPOTIFY_BRIDGE,
@@ -24,12 +25,46 @@ class StartupError(Exception):
     pass
 
 
+REQUIRED_SD_ASSETS = (
+    "icon.png",
+    "icons/close.png",
+    "icons/left_arrow.png",
+    "icons/light_off.png",
+    "icons/light_on.png",
+    "icons/like.png",
+    "icons/liked.png",
+    "icons/next.png",
+    "icons/pause.png",
+    "icons/play.png",
+    "icons/playlists.png",
+    "icons/previous.png",
+    "icons/repeat_off.png",
+    "icons/repeat_on.png",
+    "icons/repeat_on_1.png",
+    "icons/right_arrow.png",
+    "icons/search.png",
+    "icons/shuffle_off.png",
+    "icons/shuffle_on.png",
+    "icons/speaker.png",
+    "icons/volume_down.png",
+    "icons/volume_up.png",
+)
+
+
 class Spotify(BaseApp):
     def __init__(self):
         super().__init__(ambient_light=True, full_res=True, layers=2)
 
+        self.display.set_font("sans")
+        self.display.set_layer(1)
+        self.startup_gray_pen = self.display.create_pen(179, 179, 179)
+        self.startup_error_pen = self.display.create_pen(255, 0, 0)
+        if not mount_sd_card():
+            self.halt_startup_error("Loading Spotify...", "(sd card mount failed)")
+        if not self.required_sd_assets_available():
+            self.halt_startup_error("Loading Spotify...", "(icons missing sd)")
+
         self.display.set_layer(0)
-        mount_sd_card()
         try:
             icon = pngdec.PNG(self.display)
             icon.open_file(asset_path("icon.png"))
@@ -39,10 +74,7 @@ class Spotify(BaseApp):
         except Exception as e:
             print("Startup icon not loaded:", e)
 
-        self.display.set_font("sans")
         self.display.set_layer(1)
-        self.startup_gray_pen = self.display.create_pen(179, 179, 179)
-        self.startup_error_pen = self.display.create_pen(255, 0, 0)
         startup_message_at = time.time()
         self.display_startup_message("Connecting to WIFI")
 
@@ -126,6 +158,19 @@ class Spotify(BaseApp):
 
     def centered_button_bounds(self, width, height, y):
         return (self.centered_visual_x(width), y, width, height)
+
+    def sd_asset_exists(self, relative_path):
+        for root in SD_ASSET_ROOTS:
+            if root.startswith("/sd") and file_exists(root + "/" + relative_path):
+                return True
+        return False
+
+    def required_sd_assets_available(self):
+        for relative_path in REQUIRED_SD_ASSETS:
+            if not self.sd_asset_exists(relative_path):
+                print("Missing SD asset:", relative_path)
+                return False
+        return True
 
     def display_startup_message(self, text, error=None):
         self.clear(1)
