@@ -213,6 +213,15 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.2.6
+
+- Fixed speaker paging so all detected devices are available across pages.
+- Centred page counters between the navigation arrows.
+
+### 0.2.5
+
+- Made the search keyboard respond on press-down for faster typing.
+
 ### 0.2.4
 
 - Added Spotify API blocked messages to search results and speaker selection screens.
