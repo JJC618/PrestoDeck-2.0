@@ -118,6 +118,7 @@ class Spotify(BaseApp):
             return
 
         device_id, track, is_playing, shuffle, repeat, prog, dur, volume, liked = result
+        previous_track_id = (self.state.track or {}).get("id")
         if device_id:
             self.spotify_client.session.device_id = device_id
 
@@ -131,8 +132,11 @@ class Spotify(BaseApp):
             self.state.volume_percent = volume
         self.state.track_liked = liked
         self.state.last_progress_update = time.time()
+        self.state.force_redraw = True
 
         current_track_id = (track or {}).get("id")
+        if current_track_id and current_track_id != previous_track_id:
+            self.queue_album_art_refresh(current_track_id)
         if (
             previous_requested_track_id and
             current_track_id == previous_requested_track_id and
@@ -155,6 +159,9 @@ class Spotify(BaseApp):
             if self.state.track:
                 self.queue_album_art_refresh(self.state.track.get("id"))
                 self.art_fetch_after = time.time() + 0.5
+        else:
+            self.state.playback_fetch_at = time.time() + 2
+            self.state.force_redraw = True
 
     def render_speaker_screen(self):
         self.clear(1)
@@ -1327,29 +1334,37 @@ class Spotify(BaseApp):
 
     def write_track(self):
         """Writes the track name and artists on the screen."""
-        if self.state.track and self.state.menu_mode == 0:
-            self.display.set_thickness(3)
+        if self.state.menu_mode != 0:
+            return
 
-            track_name = self.state.track.get("name")
-            track_name = ''.join(i if ord(i) < 128 else ' ' for i in track_name)
-            if len(track_name) > 14:
-                track_name = track_name[:14] + " ..."
-            self.display.set_pen(self.colors._BLACK)
-            self.display.text(track_name, 20, self.height - 137, scale=1.1)
-            
-            self.display.set_pen(self.colors.WHITE)
-            self.display.text(track_name, 18, self.height - 140, scale=1.1)
-            
-            artists = ", ".join([artist.get("name") for artist in self.state.track.get("artists")])
-            artists = ''.join(i if ord(i) < 128 else ' ' for i in artists)
-            if len(artists) > 25:
-                artists = artists[:25] + " ..."
+        if not self.state.track:
             self.display.set_thickness(2)
-            self.display.set_pen(self.colors._BLACK)
-            self.display.text(artists, 20, self.height - 108, scale=0.7)
-            
-            self.display.set_pen(self.colors.WHITE)
-            self.display.text(artists, 18, self.height - 111, scale=0.7)
+            self.display.set_pen(self.ui_gray_pen)
+            self.display.text("Loading Spotify...", 130, self.height - 125, scale=0.8)
+            return
+
+        self.display.set_thickness(3)
+
+        track_name = self.state.track.get("name")
+        track_name = ''.join(i if ord(i) < 128 else ' ' for i in track_name)
+        if len(track_name) > 14:
+            track_name = track_name[:14] + " ..."
+        self.display.set_pen(self.colors._BLACK)
+        self.display.text(track_name, 20, self.height - 137, scale=1.1)
+        
+        self.display.set_pen(self.colors.WHITE)
+        self.display.text(track_name, 18, self.height - 140, scale=1.1)
+        
+        artists = ", ".join([artist.get("name") for artist in self.state.track.get("artists")])
+        artists = ''.join(i if ord(i) < 128 else ' ' for i in artists)
+        if len(artists) > 25:
+            artists = artists[:25] + " ..."
+        self.display.set_thickness(2)
+        self.display.set_pen(self.colors._BLACK)
+        self.display.text(artists, 20, self.height - 108, scale=0.7)
+        
+        self.display.set_pen(self.colors.WHITE)
+        self.display.text(artists, 18, self.height - 111, scale=0.7)
 
     async def display_loop(self):
         """Periodically updates the display with the latest track info and controls."""
@@ -1401,8 +1416,15 @@ class Spotify(BaseApp):
                     not self.state.latest_fetch or
                     time.time() - self.state.latest_fetch > PLAYBACK_FETCH_INTERVAL
                 )
+                missing_track_fetch_due = (
+                    self.state.track is None and
+                    (
+                        not self.state.latest_fetch or
+                        time.time() - self.state.latest_fetch > 5
+                    )
+                )
                 recently_touched = time.time() - self.state.last_touch_time < TOUCH_FETCH_GRACE
-                if scheduled_fetch_due or (ready_to_fetch and not recently_touched):
+                if missing_track_fetch_due or scheduled_fetch_due or (ready_to_fetch and not recently_touched):
                     self.state.latest_fetch = time.time()
                     self.state.playback_fetch_at = None
                     previous_requested_track_id = self.state.playback_fetch_track_id

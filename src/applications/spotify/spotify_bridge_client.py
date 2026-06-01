@@ -101,6 +101,8 @@ class SpotifyBridgeClient:
 
     def read_response(self, response):
         try:
+            if response.status_code >= 400:
+                raise Exception("Bridge HTTP {}".format(response.status_code))
             if response.content:
                 return response.json()
             return {}
