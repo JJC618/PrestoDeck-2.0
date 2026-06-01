@@ -368,9 +368,12 @@ class Spotify(BaseApp):
                 raise StartupError("(secrets missing bridge)")
             bridge_client = SpotifyBridgeClient(SPOTIFY_BRIDGE_BASE_URL)
             try:
-                bridge_client.health()
+                health = bridge_client.health()
             except Exception:
                 raise StartupError("(secrets missing bridge)")
+            bridge_version = health.get("bridge_version") if health else None
+            if bridge_version and bridge_version != APP_VERSION:
+                raise StartupError("(version mismatch)")
             return SpotifyBridgeFallbackClient(bridge_client, local_client)
         return local_client
         

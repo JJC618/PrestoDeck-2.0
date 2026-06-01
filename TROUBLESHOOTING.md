@@ -151,6 +151,38 @@ python3 adhoc/generate_token.py
 
 Copy the new `SPOTIFY_CREDENTIALS` block into `src/secrets.py`, then upload that file to both the Presto and the Pi.
 
+### `(version mismatch)`
+
+The Presto app and Raspberry Pi bridge are running different PrestoDeck versions.
+
+Likely causes:
+
+- The Presto files were updated but the Pi bridge files were not.
+- The Pi bridge files were copied over but the service was not restarted.
+- The Pi is running an older checkout of the GitHub repo.
+
+Fix:
+
+Update both devices from the same GitHub version. Copy the latest files to the Pi:
+
+```bash
+scp -r adhoc docs pi_bridge sd_card src README.md TROUBLESHOOTING.md admin@YOUR_PI_IP:~/PrestoDeck/
+```
+
+Then restart the bridge:
+
+```bash
+sudo systemctl restart presto-spotify-bridge
+```
+
+Check the bridge version:
+
+```bash
+curl http://YOUR_PI_IP:8787/health
+```
+
+The `bridge_version` should match the version shown on the Presto boot screen.
+
 ## Presto Stuck On Connecting To WiFi
 
 This usually means `secrets.py` is missing or the WiFi details are wrong.
