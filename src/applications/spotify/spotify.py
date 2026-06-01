@@ -4,7 +4,7 @@ import jpegdec
 import pngdec
 import uasyncio as asyncio
 from applications.spotify.spotify_assets import asset_path, file_exists, get_album_cover, get_cached_album_cover, mount_sd_card
-from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, SpotifyBridgeFallbackClient
+from applications.spotify.spotify_bridge_client import SpotifyBridgeClient, SpotifyBridgeOnlyClient
 from applications.spotify.spotify_client import Session, SpotifyWebApiClient, SpotifyWebApiError
 from applications.spotify.spotify_controls import ControlButton
 from applications.spotify.spotify_settings import (
@@ -359,6 +359,19 @@ class Spotify(BaseApp):
         self.presto.update()
             
     def get_spotify_client(self):
+        if USE_SPOTIFY_BRIDGE:
+            if not SPOTIFY_BRIDGE_BASE_URL:
+                raise StartupError("(secrets missing bridge)")
+            bridge_client = SpotifyBridgeClient(SPOTIFY_BRIDGE_BASE_URL)
+            try:
+                health = bridge_client.health()
+            except Exception:
+                raise StartupError("(bridge unavailable)")
+            bridge_version = health.get("bridge_version") if health else None
+            if bridge_version and bridge_version != APP_VERSION:
+                raise StartupError("(version mismatch)")
+            return SpotifyBridgeOnlyClient(bridge_client)
+
         if not hasattr(secrets, 'SPOTIFY_CREDENTIALS') or not secrets.SPOTIFY_CREDENTIALS:
             raise StartupError("(secrets missing local)")
 
@@ -368,23 +381,10 @@ class Spotify(BaseApp):
                 raise StartupError("(spotify uri incorrect)")
 
         try:
-            session = Session(secrets.SPOTIFY_CREDENTIALS, lazy_token=USE_SPOTIFY_BRIDGE)
+            session = Session(secrets.SPOTIFY_CREDENTIALS, lazy_token=False)
             local_client = SpotifyWebApiClient(session)
         except Exception:
             raise StartupError("(spotify uri incorrect)")
-
-        if USE_SPOTIFY_BRIDGE:
-            if not SPOTIFY_BRIDGE_BASE_URL:
-                raise StartupError("(secrets missing bridge)")
-            bridge_client = SpotifyBridgeClient(SPOTIFY_BRIDGE_BASE_URL)
-            try:
-                health = bridge_client.health()
-            except Exception:
-                raise StartupError("(secrets missing bridge)")
-            bridge_version = health.get("bridge_version") if health else None
-            if bridge_version and bridge_version != APP_VERSION:
-                raise StartupError("(version mismatch)")
-            return SpotifyBridgeFallbackClient(bridge_client, local_client)
         return local_client
         
     def setup_buttons(self):
@@ -731,6 +731,7 @@ class Spotify(BaseApp):
         self.presto.update()
 
     def draw_bridge_status(self):
+        bridge_available = getattr(self.spotify_client, "bridge_available", None)
         block_remaining = 0
         if hasattr(self.spotify_client, "spotify_block_remaining"):
             block_remaining = self.spotify_client.spotify_block_remaining()
@@ -740,7 +741,6 @@ class Spotify(BaseApp):
             self.display.text(label, 10, self.height - 24, scale=0.6)
             return
 
-        bridge_available = getattr(self.spotify_client, "bridge_available", None)
         if bridge_available is True:
             self.display.set_pen(self.bridge_ok_pen)
             label = "Bridge Active"
@@ -775,12 +775,12 @@ class Spotify(BaseApp):
         return False
 
     def bridge_status_text(self):
+        bridge_available = getattr(self.spotify_client, "bridge_available", None)
         block_remaining = 0
         if hasattr(self.spotify_client, "spotify_block_remaining"):
             block_remaining = self.spotify_client.spotify_block_remaining()
         if block_remaining:
             return "Bridge Blocked {}s".format(block_remaining)
-        bridge_available = getattr(self.spotify_client, "bridge_available", None)
         if bridge_available is True:
             return "Bridge Active"
         if bridge_available is False:

@@ -128,10 +128,9 @@ class SpotifyBridgeClient:
             response.close()
 
 
-class SpotifyBridgeFallbackClient:
-    def __init__(self, bridge_client, local_client):
+class SpotifyBridgeOnlyClient:
+    def __init__(self, bridge_client):
         self.bridge_client = bridge_client
-        self.local_client = local_client
         self.session = bridge_client.session
         self.bridge_retry_at = 0
         self.bridge_status_checked_at = 0
@@ -155,24 +154,17 @@ class SpotifyBridgeFallbackClient:
         except BridgeHttpError as e:
             if e.status_code == 429:
                 self.note_spotify_block(e.retry_after)
-                raise
-            print("Bridge startup unavailable, using local Spotify API:", e)
-            self.bridge_retry_at = time.time() + 30
-            self.bridge_available = False
-            result = self.local_client.current_playing()
-            self.session = self.local_client.session
-            return result
+            else:
+                self.note_bridge_unavailable()
+            print("Bridge startup unavailable:", e)
+            raise
         except Exception as e:
-            print("Bridge startup unavailable, using local Spotify API:", e)
-            self.bridge_retry_at = time.time() + 30
-            self.bridge_available = False
-            result = self.local_client.current_playing()
-            self.session = self.local_client.session
-            return result
+            print("Bridge startup unavailable:", e)
+            self.note_bridge_unavailable()
+            raise
 
     def transfer_playback(self, device_id):
         result = self.call("transfer_playback", device_id)
-        self.session.device_id = self.active_client().session.device_id
         return result
 
     def play(self, context_uri=None, uris=None, offset=None, position_ms=None):
@@ -233,9 +225,7 @@ class SpotifyBridgeFallbackClient:
 
         if time.time() < self.bridge_retry_at:
             self.bridge_available = False
-            result = getattr(self.local_client, method_name)(*args, **kwargs)
-            self.session = self.local_client.session
-            return result
+            raise Exception("Bridge unavailable")
 
         try:
             result = getattr(self.bridge_client, method_name)(*args, **kwargs)
@@ -247,23 +237,19 @@ class SpotifyBridgeFallbackClient:
         except BridgeHttpError as e:
             if e.status_code == 429:
                 self.note_spotify_block(e.retry_after)
-                raise
-            print("Bridge unavailable, using local Spotify API:", e)
-            self.bridge_retry_at = time.time() + 30
-            self.bridge_available = False
-            result = getattr(self.local_client, method_name)(*args, **kwargs)
-            self.session = self.local_client.session
-            return result
+            else:
+                self.note_bridge_unavailable()
+            print("Bridge unavailable:", e)
+            raise
         except Exception as e:
-            print("Bridge unavailable, using local Spotify API:", e)
-            self.bridge_retry_at = time.time() + 30
-            self.bridge_available = False
-            result = getattr(self.local_client, method_name)(*args, **kwargs)
-            self.session = self.local_client.session
-            return result
+            print("Bridge unavailable:", e)
+            self.note_bridge_unavailable()
+            raise
 
-    def active_client(self):
-        return self.local_client if self.session is self.local_client.session else self.bridge_client
+    def note_bridge_unavailable(self):
+        self.spotify_blocked_until = 0
+        self.bridge_retry_at = time.time() + 30
+        self.bridge_available = False
 
     def note_spotify_block(self, retry_after):
         try:
@@ -291,5 +277,5 @@ class SpotifyBridgeFallbackClient:
         except Exception as e:
             print("Bridge status unavailable:", e)
             self.bridge_status_checked_at = time.time()
-            self.bridge_available = False
+            self.note_bridge_unavailable()
             return None

@@ -1,6 +1,6 @@
 APP_ASSET_ROOT = "applications/spotify"
 SD_ASSET_ROOTS = ("/sd/applications/spotify", "/sd")
-APP_VERSION = "0.2.9"
+APP_VERSION = "0.2.12"
 
 try:
     import secrets as project_secrets

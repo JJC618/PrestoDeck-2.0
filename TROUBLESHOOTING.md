@@ -93,6 +93,7 @@ Check `secrets.py` on the Presto root and make sure the SSID and password match 
 ### `(secrets missing local)`
 
 The Presto cannot find usable Spotify credentials in its local `secrets.py`.
+This only applies if `USE_SPOTIFY_BRIDGE = False`.
 
 Likely causes:
 
@@ -106,14 +107,32 @@ Copy your private `src/secrets.py` to the Presto root so it sits beside `main.py
 
 ### `(secrets missing bridge)`
 
-The Presto is set to use the Raspberry Pi bridge, but it cannot contact it.
+The Presto is set to use the Raspberry Pi bridge, but the bridge URL is missing from `secrets.py`.
 
 Likely causes:
 
-- `SPOTIFY_BRIDGE_BASE_URL` is missing or wrong in `secrets.py`.
+- `SPOTIFY_BRIDGE_BASE_URL` is missing or blank in `secrets.py`.
+- `USE_SPOTIFY_BRIDGE = True`, but the bridge URL was not copied in.
+
+Fix:
+
+Set the bridge URL in the Presto `secrets.py` file:
+
+```python
+SPOTIFY_BRIDGE_BASE_URL = "http://YOUR_PI_IP:8787"
+```
+
+### `(bridge unavailable)`
+
+The Presto has a bridge URL, but it cannot contact the Raspberry Pi bridge service.
+
+Likely causes:
+
 - The Pi bridge service is not running.
+- The Pi is turned off or disconnected from the network.
 - The Pi has a different IP address.
-- The Pi bridge files or Pi-side `src/secrets.py` are missing.
+- `SPOTIFY_BRIDGE_BASE_URL` points to the wrong IP address.
+- A firewall or network issue is blocking port `8787`.
 
 Fix:
 
@@ -133,6 +152,7 @@ systemctl status presto-spotify-bridge
 ### `(spotify uri incorrect)`
 
 The Spotify credentials are missing required values, invalid, expired, or do not have the permissions the app needs.
+In the recommended bridge setup, these credentials are used by the Pi bridge.
 
 Likely causes:
 
@@ -149,7 +169,7 @@ Run the token helper again:
 python3 adhoc/generate_token.py
 ```
 
-Copy the new `SPOTIFY_CREDENTIALS` block into `src/secrets.py`, then upload that file to both the Presto and the Pi.
+Copy the new `SPOTIFY_CREDENTIALS` block into `src/secrets.py`, then copy that file to the Pi and restart the bridge.
 
 ### `(version mismatch)`
 
@@ -302,7 +322,7 @@ The token must include playlist read scopes. Copy the new `SPOTIFY_CREDENTIALS` 
 src/secrets.py
 ```
 
-Then upload that file to the Presto root and copy it to the Pi:
+Then copy it to the Pi and restart the bridge:
 
 ```bash
 scp src/secrets.py admin@YOUR_PI_IP:~/PrestoDeck/src/secrets.py

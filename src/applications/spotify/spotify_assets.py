@@ -155,8 +155,7 @@ def get_album_cover(track, size=250, allow_direct_fallback=True):
         if img:
             save_album_cover_to_cache(cache_root, cache_path, img, "Failed caching bridge image:")
             return img
-        if not allow_direct_fallback:
-            return None
+        return None
 
     images = track["album"]["images"]
     image_index = 0 if size > 250 or len(images) == 1 else 1
