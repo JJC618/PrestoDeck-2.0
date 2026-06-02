@@ -12,7 +12,7 @@ For best performance, the Presto talks to a small Raspberry Pi bridge on your lo
 
 - Pimoroni Presto
 - Micro SD card for UI icons
-- Raspberry Pi on the same WiFi network, recommended
+- Raspberry Pi on the same WiFi network, required for the bridge
 - Spotify Premium account
 
 ## Setup Overview
@@ -178,7 +178,7 @@ exit
 Back on your computer, from inside the `PrestoDeck-2.0` folder, copy the project files to the Pi:
 
 ```bash
-scp -r adhoc docs pi_bridge sd_card src README.md admin@YOUR_PI_IP:~/PrestoDeck/
+scp -r adhoc docs pi_bridge sd_card src README.md TROUBLESHOOTING.md admin@YOUR_PI_IP:~/PrestoDeck/
 ```
 
 If you are using a different Pi username, change `admin@YOUR_PI_IP` to match your setup.
