@@ -54,6 +54,12 @@ On your computer, install the helper dependency:
 python3 -m pip install spotipy
 ```
 
+Open the downloaded project folder:
+
+```bash
+cd PrestoDeck-2.0
+```
+
 Then run:
 
 ```bash
