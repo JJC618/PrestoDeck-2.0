@@ -24,6 +24,27 @@ sudo systemctl status presto-spotify-bridge
 journalctl -u presto-spotify-bridge -f
 ```
 
+## Optional Log Limit
+
+To stop Pi journal logs from growing too large over time, check usage with:
+
+```bash
+journalctl --disk-usage
+```
+
+Then set a cap in `/etc/systemd/journald.conf`:
+
+```ini
+SystemMaxUse=100M
+MaxRetentionSec=14day
+```
+
+Restart journald after saving:
+
+```bash
+sudo systemctl restart systemd-journald
+```
+
 ## Manual Run
 
 ```bash

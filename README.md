@@ -202,6 +202,37 @@ Test from another device on the same network:
 curl http://YOUR_PI_IP:8787/health
 ```
 
+## Optional: Limit Pi Logs
+
+The bridge writes service logs to the Raspberry Pi system journal. Raspberry Pi OS usually manages this automatically, but you can cap journal storage so logs cannot slowly grow forever.
+
+The album-art cache is already capped by the app at 1GB. This optional step is only for the Pi service logs.
+
+Check current journal usage:
+
+```bash
+journalctl --disk-usage
+```
+
+Edit the journal settings:
+
+```bash
+sudo nano /etc/systemd/journald.conf
+```
+
+Add or update these lines:
+
+```ini
+SystemMaxUse=100M
+MaxRetentionSec=14day
+```
+
+Then restart the journal service:
+
+```bash
+sudo systemctl restart systemd-journald
+```
+
 ## Updating The Bridge
 
 After copying new files to the Raspberry Pi:
