@@ -257,6 +257,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 - First stable public release after soak testing confirmed controlled idle Spotify API usage.
 - Promoted the Presto app and Raspberry Pi bridge to matching `1.0.0` versions.
+- Added a human-triggered `/state` refresh when exiting fullscreen album art so the player view catches up promptly without increasing idle polling.
 
 ### 0.3.13
 

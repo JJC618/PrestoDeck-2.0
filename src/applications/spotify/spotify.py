@@ -215,6 +215,13 @@ class Spotify(BaseApp):
         self.state.playback_fetch_at = now + 1
         self.state.playback_fetch_until = now + 6
         self.state.playback_fetch_track_id = (self.state.track or {}).get("id")
+        self.state.playback_fetch_allow_recently = True
+
+    def schedule_fullscreen_exit_fetch(self):
+        self.state.playback_fetch_at = time.time() + 0.75
+        self.state.playback_fetch_until = None
+        self.state.playback_fetch_track_id = None
+        self.state.playback_fetch_allow_recently = False
 
     def run_api_action(self, action, label="Working..."):
         if self.state.api_busy:
@@ -1507,6 +1514,7 @@ class Spotify(BaseApp):
                         self.state.force_redraw = True
                         if self.state.track:
                             self.restore_player_album_art()
+                            self.schedule_fullscreen_exit_fetch()
                         self.clear(1)
                         self.presto.update()
                         while self.touch.state:
@@ -1858,10 +1866,15 @@ class Spotify(BaseApp):
                     self.state.latest_fetch = time.time()
                     self.state.playback_fetch_at = None
                     previous_requested_track_id = self.state.playback_fetch_track_id
+                    allow_recently_played = (
+                        self.state.playback_fetch_allow_recently and
+                        self.should_fetch_recently_played()
+                    )
+                    self.state.playback_fetch_allow_recently = True
                     result = self.run_api_action(
                         lambda: fetch_state(
                             self.spotify_client,
-                            allow_recently_played=self.should_fetch_recently_played(),
+                            allow_recently_played=allow_recently_played,
                         ),
                         "Failed fetching playback state:",
                     )

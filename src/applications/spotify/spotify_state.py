@@ -24,6 +24,7 @@ class State:
         self.playback_fetch_at = None
         self.playback_fetch_until = None
         self.playback_fetch_track_id = None
+        self.playback_fetch_allow_recently = True
         self.recently_played_attempts = 0
         self.recently_played_next_at = 0
         self.devices_data = []
@@ -75,6 +76,7 @@ class State:
         state.playback_fetch_at = self.playback_fetch_at
         state.playback_fetch_until = self.playback_fetch_until
         state.playback_fetch_track_id = self.playback_fetch_track_id
+        state.playback_fetch_allow_recently = self.playback_fetch_allow_recently
         state.recently_played_attempts = self.recently_played_attempts
         state.recently_played_next_at = self.recently_played_next_at
         state.fullscreen_art = self.fullscreen_art
@@ -108,6 +110,7 @@ class State:
             self.playback_fetch_at == other.playback_fetch_at and
             self.playback_fetch_until == other.playback_fetch_until and
             self.playback_fetch_track_id == other.playback_fetch_track_id and
+            self.playback_fetch_allow_recently == other.playback_fetch_allow_recently and
             self.recently_played_attempts == other.recently_played_attempts and
             self.recently_played_next_at == other.recently_played_next_at and
             self.fullscreen_art == other.fullscreen_art and
