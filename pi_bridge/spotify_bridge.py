@@ -50,7 +50,7 @@ QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
-BRIDGE_VERSION = "0.3.1"
+BRIDGE_VERSION = "0.3.2"
 
 
 class SpotifyBridgeError(Exception):
@@ -134,6 +134,8 @@ class SpotifySession:
 class BridgeHandler(BaseHTTPRequestHandler):
     session = SpotifySession(project_secrets.SPOTIFY_CREDENTIALS)
     preload_lock = threading.Lock()
+    album_art_preload_lock = threading.Lock()
+    album_art_preload_inflight = set()
     last_queue_preload = 0
     state_lock = threading.Lock()
     state_cache = None
@@ -307,9 +309,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         size = max(64, min(640, size))
         track_id = query.get("track_id", [""])[0]
         image_url = query.get("image_url", [""])[0]
+        preload_size = query.get("preload_size", [""])[0]
+        preload_image_url = query.get("preload_image_url", [""])[0]
 
         if track_id and image_url:
             cache_path = self.album_art_cache_path_for_key(track_id, size)
+            self.preload_album_art_url_soon(track_id, preload_image_url, preload_size)
         else:
             state = self.__class__.state_cache
             track = state.get("item") if state else None
@@ -325,6 +330,43 @@ class BridgeHandler(BaseHTTPRequestHandler):
             payload = f.read()
         self.send_bytes(payload, "image/jpeg")
         return None
+
+    def preload_album_art_url_soon(self, track_id, image_url, size):
+        if not track_id or not image_url:
+            return
+        if not self.presto_is_active() or self.spotify_block_remaining():
+            return
+        try:
+            size = int(size)
+        except (TypeError, ValueError):
+            return
+        size = max(64, min(640, size))
+        cache_path = self.album_art_cache_path_for_key(track_id, size)
+        if cache_path.exists():
+            return
+
+        key = "{}_{}".format(track_id, size)
+        with self.__class__.album_art_preload_lock:
+            if key in self.__class__.album_art_preload_inflight:
+                return
+            self.__class__.album_art_preload_inflight.add(key)
+
+        thread = threading.Thread(
+            target=self.preload_album_art_url,
+            args=(key, image_url, size, cache_path),
+            daemon=True,
+        )
+        thread.start()
+
+    def preload_album_art_url(self, key, image_url, size, cache_path):
+        try:
+            if self.presto_is_active() and not self.spotify_block_remaining() and not cache_path.exists():
+                self.fetch_album_art(image_url, size, cache_path)
+        except Exception as e:
+            print("Album-art pair preload failed:", e)
+        finally:
+            with self.__class__.album_art_preload_lock:
+                self.__class__.album_art_preload_inflight.discard(key)
 
     def preload_current_album_art_soon(self, track):
         if not self.presto_is_active() or self.spotify_block_remaining():

@@ -162,19 +162,21 @@ def get_album_cover_from_bridge(track, size):
     if time.time() < BRIDGE_IMAGE_RETRY_AT:
         return None
 
-    images = track["album"]["images"]
-    image_index = 0 if size > 250 or len(images) == 1 else 1
-    image_url = images[image_index]["url"]
+    image_url = album_image_url(track, size)
     track_id = track.get("id") or track.get("uri", "unknown").split(":")[-1]
+    preload_size = 480 if size <= 250 else 250
+    preload_image_url = album_image_url(track, preload_size)
 
     response = None
     try:
         response = requests.get(
-            "{}/album-art/current?size={}&track_id={}&image_url={}".format(
+            "{}/album-art/current?size={}&track_id={}&image_url={}&preload_size={}&preload_image_url={}".format(
                 SPOTIFY_BRIDGE_BASE_URL.rstrip("/"),
                 size,
                 quote(track_id),
                 quote(image_url),
+                preload_size,
+                quote(preload_image_url),
             )
         )
         if response.status_code == 200:
@@ -189,3 +191,9 @@ def get_album_cover_from_bridge(track, size):
         if response:
             response.close()
     return None
+
+
+def album_image_url(track, size):
+    images = track["album"]["images"]
+    image_index = 0 if size > 250 or len(images) == 1 else 1
+    return images[image_index]["url"]

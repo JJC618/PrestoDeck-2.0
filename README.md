@@ -253,6 +253,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.3.2
+
+- Preloaded matching `480x480` album art on the bridge when the player requests `250x250` art for a new track.
+
 ### 0.3.1
 
 - Prevented the player screen from showing `Loading Spotify...` after the bridge fails.
