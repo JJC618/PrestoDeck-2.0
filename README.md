@@ -48,16 +48,16 @@ Enable Web API access.
 
 ## Generate Spotify Credentials
 
-On your computer, install the helper dependency:
-
-```bash
-python3 -m pip install spotipy
-```
-
-Open the downloaded project folder:
+On your computer, open the downloaded project folder:
 
 ```bash
 cd PrestoDeck-2.0
+```
+
+Install the helper dependency:
+
+```bash
+python3 -m pip install spotipy
 ```
 
 Then run:
