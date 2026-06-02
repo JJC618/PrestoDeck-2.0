@@ -1644,7 +1644,8 @@ class Spotify(BaseApp):
             return
 
         if not self.state.track:
-            if self.spotify_api_blocked():
+            bridge_available = getattr(self.spotify_client, "bridge_available", None)
+            if self.spotify_api_blocked() or bridge_available is False:
                 return
             self.display.set_thickness(2)
             self.display.set_pen(self.ui_gray_pen)

@@ -247,6 +247,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.3.1
+
+- Prevented the player screen from showing `Loading Spotify...` after the bridge fails.
+
 ### 0.3.0
 
 - Made the Raspberry Pi bridge compulsory for all Spotify API communication.
