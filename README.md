@@ -253,6 +253,11 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 1.0.0
+
+- First stable public release after soak testing confirmed controlled idle Spotify API usage.
+- Promoted the Presto app and Raspberry Pi bridge to matching `1.0.0` versions.
+
 ### 0.3.13
 
 - Treated successful non-JSON Spotify command responses as empty success so shuffle/repeat do not roll back after Spotify accepts the command.
