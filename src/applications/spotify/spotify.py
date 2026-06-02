@@ -22,6 +22,10 @@ class StartupError(Exception):
     pass
 
 
+RECENTLY_PLAYED_BURST_LIMIT = 2
+RECENTLY_PLAYED_SLOW_INTERVAL = 600
+
+
 REQUIRED_SD_ASSETS = (
     "icon.png",
     "icons/close.png",
@@ -222,7 +226,9 @@ class Spotify(BaseApp):
         if not result:
             return
 
-        device_id, track, is_playing, shuffle, repeat, prog, dur, volume, liked = result
+        device_id, track, is_playing, shuffle, repeat, prog, dur, volume, liked = result[:9]
+        source = result[9] if len(result) > 9 else "current"
+        self.note_playback_source(source)
         previous_track_id = (self.state.track or {}).get("id")
         if device_id:
             self.spotify_client.session.device_id = device_id
@@ -252,6 +258,20 @@ class Spotify(BaseApp):
         else:
             self.state.playback_fetch_until = None
             self.state.playback_fetch_track_id = None
+
+    def should_fetch_recently_played(self):
+        if self.state.recently_played_attempts < RECENTLY_PLAYED_BURST_LIMIT:
+            return True
+        return time.time() >= self.state.recently_played_next_at
+
+    def note_playback_source(self, source):
+        if source == "recently_played":
+            self.state.recently_played_attempts += 1
+            if self.state.recently_played_attempts >= RECENTLY_PLAYED_BURST_LIMIT:
+                self.state.recently_played_next_at = time.time() + RECENTLY_PLAYED_SLOW_INTERVAL
+        elif source == "current":
+            self.state.recently_played_attempts = 0
+            self.state.recently_played_next_at = 0
 
     def prepare_startup_playback(self):
         if self.state.api_busy:
@@ -1740,7 +1760,10 @@ class Spotify(BaseApp):
                     self.state.playback_fetch_at = None
                     previous_requested_track_id = self.state.playback_fetch_track_id
                     result = self.run_api_action(
-                        lambda: fetch_state(self.spotify_client),
+                        lambda: fetch_state(
+                            self.spotify_client,
+                            allow_recently_played=self.should_fetch_recently_played(),
+                        ),
                         "Failed fetching playback state:",
                     )
                     if result:
@@ -1832,7 +1855,7 @@ class Spotify(BaseApp):
             gc.collect()
             await asyncio.sleep_ms(200)
 
-def fetch_state(spotify_client, startup=False, raise_errors=False):
+def fetch_state(spotify_client, startup=False, raise_errors=False, allow_recently_played=True):
     """Fetches the current playback state from Spotify."""
     current_track = None
     is_playing = False
@@ -1843,6 +1866,7 @@ def fetch_state(spotify_client, startup=False, raise_errors=False):
     duration_ms = 0
     volume_percent = None
     track_liked = False
+    source = "current"
     try:
         if startup and hasattr(spotify_client, "startup_state"):
             resp = spotify_client.startup_state()
@@ -1864,12 +1888,13 @@ def fetch_state(spotify_client, startup=False, raise_errors=False):
         if raise_errors:
             raise
 
-    if not current_track:
+    if not current_track and allow_recently_played:
         try:
             resp = spotify_client.recently_played()
             if resp and resp.get("items"):
                 current_track = resp["items"][0]["track"]
                 duration_ms = current_track.get("duration_ms", 0)
+                source = "recently_played"
                 print("Got recently playing track: " + current_track.get("name"))
         except Exception as e:
             print("Failed to get recently played track:", e)
@@ -1879,7 +1904,7 @@ def fetch_state(spotify_client, startup=False, raise_errors=False):
     if not current_track:
         return None
 
-    return device_id, current_track, is_playing, shuffle, repeat, progress_ms, duration_ms, volume_percent, track_liked
+    return device_id, current_track, is_playing, shuffle, repeat, progress_ms, duration_ms, volume_percent, track_liked, source
 
 def launch():
     """Launches the Spotify app and starts the event loop."""
