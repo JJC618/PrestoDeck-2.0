@@ -218,9 +218,14 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ### 0.3.0
 
-- Made the Raspberry Pi bridge compulsory and removed the Presto local Spotify mode.
-- Renamed the missing bridge URL boot error and hardened album-art requests against old clients.
-- Removed obsolete Presto local Spotify API client code.
+- Made the Raspberry Pi bridge compulsory for all Spotify API communication.
+- Removed the Presto-side local Spotify API client and the old optional bridge setting.
+- Added `spotify_url.py` for the small URL-encoding helpers still needed by bridge requests.
+- Renamed the missing bridge URL boot error to `(bridge url missing)`.
+- Kept stopped or unreachable bridge services under `(bridge unavailable)`.
+- Improved startup handling for rejected Pi-side Spotify credentials.
+- Hardened album-art requests so old clients cannot trigger playback-state lookups.
+- Updated the release test script to match the new bridge-only file layout.
 
 ### 0.2.12
 
