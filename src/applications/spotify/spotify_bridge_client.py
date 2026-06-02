@@ -117,12 +117,17 @@ class SpotifyBridgeClient:
                 try:
                     payload = response.json()
                     message = payload.get("error", message)
+                    if isinstance(message, dict):
+                        message = json.dumps(message)
                     retry_after = payload.get("retry_after")
                 except Exception:
                     pass
                 raise BridgeHttpError(response.status_code, message, retry_after)
             if response.content:
-                return response.json()
+                try:
+                    return response.json()
+                except Exception:
+                    return {}
             return {}
         finally:
             response.close()
@@ -237,9 +242,12 @@ class SpotifyBridgeOnlyClient:
         except BridgeHttpError as e:
             if e.status_code == 429:
                 self.note_spotify_block(e.retry_after)
-            else:
+            elif e.status_code >= 500:
                 self.note_bridge_unavailable()
-            print("Bridge unavailable:", e)
+            else:
+                self.bridge_retry_at = 0
+                self.bridge_available = True
+            print("Bridge API error:", e)
             raise
         except Exception as e:
             print("Bridge unavailable:", e)

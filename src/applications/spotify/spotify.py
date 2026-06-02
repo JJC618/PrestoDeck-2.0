@@ -8,6 +8,8 @@ from applications.spotify.spotify_bridge_client import BridgeHttpError, SpotifyB
 from applications.spotify.spotify_controls import ControlButton
 from applications.spotify.spotify_settings import (
     APP_VERSION,
+    BRIDGE_HEALTH_ALERT_INTERVAL,
+    BRIDGE_HEALTH_INTERVAL,
     PLAYBACK_FETCH_INTERVAL,
     PLAYLIST_CACHE_SECONDS,
     SD_ASSET_ROOTS,
@@ -487,19 +489,36 @@ class Spotify(BaseApp):
             self.state.force_redraw = True
 
         def toggle_shuffle(self):
-            self.spotify_client.toggle_shuffle(not self.state.shuffle)
-            self.state.shuffle = not self.state.shuffle
+            previous_shuffle = self.state.shuffle
+            next_shuffle = not previous_shuffle
+            self.state.shuffle = next_shuffle
             self.state.force_redraw = True
+            self.redraw_player_controls_now()
+            try:
+                self.spotify_client.toggle_shuffle(next_shuffle)
+            except Exception:
+                self.state.shuffle = previous_shuffle
+                self.state.force_redraw = True
+                self.redraw_player_controls_now()
+                raise
 
         def toggle_repeat(self):
+            previous_repeat = self.state.repeat
             next_repeat = {
                 "off": "context",
                 "context": "track",
                 "track": "off",
-            }.get(self.state.repeat, "context")
-            self.spotify_client.toggle_repeat(next_repeat)
+            }.get(previous_repeat, "context")
             self.state.repeat = next_repeat
             self.state.force_redraw = True
+            self.redraw_player_controls_now()
+            try:
+                self.spotify_client.toggle_repeat(next_repeat)
+            except Exception:
+                self.state.repeat = previous_repeat
+                self.state.force_redraw = True
+                self.redraw_player_controls_now()
+                raise
 
         def volume_down(self):
             self.adjust_volume(-5)
@@ -589,6 +608,17 @@ class Spotify(BaseApp):
             ControlButton(self.display, name, icons, bounds, on_press, update)
             for name, icons, bounds, on_press, update in buttons_config
         ]
+
+    def redraw_player_controls_now(self):
+        if self.state.menu_mode != 0 or self.state.fullscreen_art:
+            return
+        self.clear(1)
+        for button in self.buttons:
+            button.update(self.state, button)
+            button.draw(self.state)
+        self.write_track()
+        self.draw_volume_overlay()
+        self.presto.update()
 
     def fetch_devices(self):
         """Downloads active hardware device routes available to target."""
@@ -824,7 +854,11 @@ class Spotify(BaseApp):
         if now < self.bridge_status_next_at:
             return
         previous_label = self.bridge_status_text()
-        self.bridge_status_next_at = now + 15
+        if self.spotify_api_blocked() or getattr(self.spotify_client, "bridge_available", None) is not True:
+            interval = BRIDGE_HEALTH_ALERT_INTERVAL
+        else:
+            interval = BRIDGE_HEALTH_INTERVAL
+        self.bridge_status_next_at = now + interval
         self.spotify_client.refresh_bridge_status()
         current_label = self.bridge_status_text()
         if current_label != previous_label or current_label != self.bridge_status_label:
@@ -1030,11 +1064,17 @@ class Spotify(BaseApp):
             self.state.toast_until = time.time() + 3
         except Exception as e:
             print("Failed adding track to playlist:", e)
-            self.state.toast_message = "Playlist add failed"
+            self.state.toast_message = self.playlist_add_error_message(e)
             self.state.toast_until = time.time() + 3
         self.state.menu_mode = 9
         self.clear(1)
         self.state.force_redraw = True
+
+    def playlist_add_error_message(self, error):
+        message = str(error).lower()
+        if "forbidden" in message or "403" in message:
+            return "Playlist permission denied"
+        return "Playlist add failed"
 
     def fetch_and_render_queue(self):
         """Downloads upcoming queue tracks and opens the queue screen."""

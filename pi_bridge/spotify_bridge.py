@@ -50,7 +50,7 @@ QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
-BRIDGE_VERSION = "0.3.5"
+BRIDGE_VERSION = "0.3.13"
 
 
 class SpotifyBridgeError(Exception):
@@ -121,9 +121,12 @@ class SpotifySession:
         try:
             with urlopen(req, timeout=10) as response:
                 content = response.read()
-                if not content:
+                if not content or not content.strip():
                     return {}
-                return json.loads(content.decode("utf-8"))
+                try:
+                    return json.loads(content.decode("utf-8").strip())
+                except ValueError:
+                    return {}
         except HTTPError as e:
             message = e.read().decode("utf-8", "ignore")
             raise SpotifyBridgeError(e.code, message or e.reason, e.headers.get("Retry-After"))
@@ -284,6 +287,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     print("Spotify rate limited playback state, using cached state")
                     return cls.state_cache
                 raise
+
+    def update_cached_playback_field(self, key, value):
+        cls = self.__class__
+        with cls.state_lock:
+            if cls.state_cache:
+                cls.state_cache[key] = value
+                cls.state_cache_at = time.time()
 
     def attach_liked_state(self, state):
         track = state.get("item") if state else None
@@ -503,11 +513,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
         if path == "/shuffle":
             state = str(body.get("state", query.get("state", ["false"])[0])).lower()
             state = "true" if state in ("1", "true", "on", "yes") else "false"
-            return self.session.request("PUT", "/me/player/shuffle?state={}".format(state))
+            result = self.session.request("PUT", "/me/player/shuffle?state={}".format(state))
+            self.update_cached_playback_field("shuffle_state", state == "true")
+            return result
         if path == "/repeat":
             state = body.get("state", query.get("state", ["off"])[0])
             state = state if state in ("track", "context", "off") else "off"
-            return self.session.request("PUT", "/me/player/repeat?state={}".format(state))
+            result = self.session.request("PUT", "/me/player/repeat?state={}".format(state))
+            self.update_cached_playback_field("repeat_state", state)
+            return result
         if path == "/queue/add":
             uri = body.get("uri") or query.get("uri", [""])[0]
             if not uri:
@@ -541,7 +555,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             playlist_id = playlist_uri.split(":")[-1]
             return self.session.request(
                 "POST",
-                "/playlists/{}/tracks".format(quote(playlist_id)),
+                "/playlists/{}/items".format(quote(playlist_id)),
                 {"uris": [track_uri]},
                 add_device_id=False,
             )

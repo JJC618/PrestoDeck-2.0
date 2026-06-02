@@ -253,6 +253,38 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.3.13
+
+- Treated successful non-JSON Spotify command responses as empty success so shuffle/repeat do not roll back after Spotify accepts the command.
+
+### 0.3.12
+
+- Updated the bridge playback cache immediately after shuffle and repeat commands so the Presto does not redraw stale button states.
+
+### 0.3.11
+
+- Treated blank Spotify command responses as successful empty JSON so controls do not mark the bridge unavailable.
+
+### 0.3.10
+
+- Updated shuffle and repeat icons immediately when pressed, with rollback if Spotify rejects the command.
+
+### 0.3.9
+
+- Updated playlist additions to Spotify's current `/playlists/{playlist_id}/items` endpoint, generated Spotify scopes with spaces, and kept playlist-add errors generic unless Spotify reports a permission issue.
+
+### 0.3.8
+
+- Show a clearer message when Spotify rejects a playlist add as permission denied.
+
+### 0.3.7
+
+- Kept the bridge marked available after Spotify returns a command-specific client error, and handled empty successful command responses cleanly.
+
+### 0.3.6
+
+- Reduced normal bridge health checks to quiet the Raspberry Pi logs while keeping faster checks during blocked or failed bridge states.
+
 ### 0.3.5
 
 - Restored the cached `250x250` player artwork from the bridge when exiting fullscreen album-art mode.
