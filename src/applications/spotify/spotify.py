@@ -121,6 +121,8 @@ class Spotify(BaseApp):
         self.album_art_fetched_tracks = {}
         self.album_art_requested_tracks = {}
         self.album_art_bounds = None
+        self.player_art_track_id = None
+        self.player_art_img = None
         self.fullscreen_art_track_id = None
         self.fullscreen_art_img = None
         self.fullscreen_art_fetch_attempted_tracks = {}
@@ -250,7 +252,7 @@ class Spotify(BaseApp):
 
         current_track_id = (track or {}).get("id")
         if current_track_id != previous_track_id:
-            self.reset_fullscreen_album_art()
+            self.reset_album_art_memory()
             if current_track_id:
                 self.queue_album_art_refresh(current_track_id)
         if (
@@ -1464,7 +1466,7 @@ class Spotify(BaseApp):
                         self.state.fullscreen_art = False
                         self.state.force_redraw = True
                         if self.state.track:
-                            self.queue_album_art_refresh(self.state.track.get("id"))
+                            self.restore_player_album_art()
                         self.clear(1)
                         self.presto.update()
                         while self.touch.state:
@@ -1544,6 +1546,8 @@ class Spotify(BaseApp):
         size = 250
         retry_key = "{}_{}".format(track_id, size)
         if self.album_art_requested_tracks.get(retry_key):
+            if self.player_art_track_id == track_id and self.player_art_img:
+                self.show_image(self.player_art_img)
             self.pending_art_track_id = None
             return
         if time.time() < self.album_art_retry_after.get(retry_key, 0):
@@ -1575,6 +1579,8 @@ class Spotify(BaseApp):
         self.album_art_requested_tracks[retry_key] = True
         img = get_album_cover(self.state.track, size)
         if img:
+            self.player_art_track_id = track_id
+            self.player_art_img = img
             self.show_image(img)
             self.album_art_fetched_tracks[retry_key] = True
             self.pending_art_track_id = None
@@ -1583,10 +1589,34 @@ class Spotify(BaseApp):
             self.show_icon_placeholder(fullscreen=self.pending_art_fullscreen)
         self.pending_art_track_id = None
 
-    def reset_fullscreen_album_art(self):
+    def reset_album_art_memory(self):
+        self.player_art_track_id = None
+        self.player_art_img = None
         self.fullscreen_art_track_id = None
         self.fullscreen_art_img = None
         self.fullscreen_art_fetch_attempted_tracks = {}
+
+    def get_player_album_art(self):
+        track = self.state.track
+        if not track:
+            return None
+
+        track_id = track.get("id") or track.get("uri")
+        if self.player_art_track_id == track_id and self.player_art_img:
+            return self.player_art_img
+
+        img = get_cached_album_cover(track, 250) or get_album_cover(track, 250)
+        if img:
+            self.player_art_track_id = track_id
+            self.player_art_img = img
+        return img
+
+    def restore_player_album_art(self):
+        img = self.get_player_album_art()
+        if img:
+            self.show_image(img)
+        else:
+            self.show_icon_placeholder()
 
     def get_fullscreen_album_art(self):
         track = self.state.track

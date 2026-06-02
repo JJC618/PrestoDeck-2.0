@@ -253,6 +253,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.3.5
+
+- Restored the cached `250x250` player artwork from the bridge when exiting fullscreen album-art mode.
+
 ### 0.3.4
 
 - Pulled fullscreen album art from the bridge once when the idle fullscreen view opens, then reused it in memory for the active track.
