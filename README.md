@@ -253,6 +253,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 0.3.4
+
+- Pulled fullscreen album art from the bridge once when the idle fullscreen view opens, then reused it in memory for the active track.
+
 ### 0.3.3
 
 - Limited automatic recently-played fallback calls after Spotify returns no active track.

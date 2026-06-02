@@ -121,6 +121,9 @@ class Spotify(BaseApp):
         self.album_art_fetched_tracks = {}
         self.album_art_requested_tracks = {}
         self.album_art_bounds = None
+        self.fullscreen_art_track_id = None
+        self.fullscreen_art_img = None
+        self.fullscreen_art_fetch_attempted_tracks = {}
         self.pending_art_track_id = None
         self.pending_art_fullscreen = False
         self.art_fetch_after = 0
@@ -246,8 +249,10 @@ class Spotify(BaseApp):
         self.state.force_redraw = True
 
         current_track_id = (track or {}).get("id")
-        if current_track_id and current_track_id != previous_track_id:
-            self.queue_album_art_refresh(current_track_id)
+        if current_track_id != previous_track_id:
+            self.reset_fullscreen_album_art()
+            if current_track_id:
+                self.queue_album_art_refresh(current_track_id)
         if (
             previous_requested_track_id and
             current_track_id == previous_requested_track_id and
@@ -1578,6 +1583,30 @@ class Spotify(BaseApp):
             self.show_icon_placeholder(fullscreen=self.pending_art_fullscreen)
         self.pending_art_track_id = None
 
+    def reset_fullscreen_album_art(self):
+        self.fullscreen_art_track_id = None
+        self.fullscreen_art_img = None
+        self.fullscreen_art_fetch_attempted_tracks = {}
+
+    def get_fullscreen_album_art(self):
+        track = self.state.track
+        if not track:
+            return None
+
+        track_id = track.get("id") or track.get("uri")
+        if self.fullscreen_art_track_id == track_id and self.fullscreen_art_img:
+            return self.fullscreen_art_img
+
+        img = get_cached_album_cover(track, 480) or get_cached_album_cover(track, 250)
+        if not img and not self.fullscreen_art_fetch_attempted_tracks.get(track_id):
+            self.fullscreen_art_fetch_attempted_tracks[track_id] = True
+            img = get_album_cover(track, 480) or get_album_cover(track, 250)
+
+        if img:
+            self.fullscreen_art_track_id = track_id
+            self.fullscreen_art_img = img
+        return img
+
     def show_fullscreen_image(self, img):
         """Displays album art full screen for idle playback mode."""
         try:
@@ -1784,7 +1813,7 @@ class Spotify(BaseApp):
                 if self.state.track and not self.state.fullscreen_art and time.time() - self.state.last_touch_time > 30:
                     self.state.fullscreen_art = True
                     self.state.force_redraw = False
-                    img = get_cached_album_cover(self.state.track, 480) or get_cached_album_cover(self.state.track, 250)
+                    img = self.get_fullscreen_album_art()
                     if img:
                         self.show_fullscreen_image(img)
                     else:
@@ -1796,10 +1825,7 @@ class Spotify(BaseApp):
                 if self.state.fullscreen_art:
                     progress_bucket = int(self.state.get_current_progress() // 5000) if self.state.duration_ms else -1
                     if progress_bucket != self.state.fullscreen_progress_bucket:
-                        img = (
-                            get_cached_album_cover(self.state.track, 480) or
-                            get_cached_album_cover(self.state.track, 250)
-                        ) if self.state.track else None
+                        img = self.get_fullscreen_album_art()
                         if img:
                             self.show_fullscreen_image(img)
                         else:
@@ -1808,7 +1834,7 @@ class Spotify(BaseApp):
                     if prev_state != self.state or self.state.force_redraw:
                         self.state.force_redraw = False
                         if self.state.track:
-                            img = get_cached_album_cover(self.state.track, 480) or get_cached_album_cover(self.state.track, 250)
+                            img = self.get_fullscreen_album_art()
                             if img:
                                 self.show_fullscreen_image(img)
                             else:
