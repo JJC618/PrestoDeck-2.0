@@ -26,6 +26,7 @@ class StartupError(Exception):
 
 RECENTLY_PLAYED_BURST_LIMIT = 2
 RECENTLY_PLAYED_SLOW_INTERVAL = 600
+TRACK_END_FETCH_DELAY = 3
 
 
 REQUIRED_SD_ASSETS = (
@@ -223,6 +224,20 @@ class Spotify(BaseApp):
         self.state.playback_fetch_track_id = None
         self.state.playback_fetch_allow_recently = False
 
+    def schedule_track_end_fetch(self):
+        track_id = (self.state.track or {}).get("id")
+        if not track_id or not self.state.is_playing or not self.state.duration_ms:
+            self.cancel_track_end_fetch()
+            return
+
+        remaining_ms = max(0, self.state.duration_ms - self.state.get_current_progress())
+        self.state.track_end_fetch_at = time.time() + (remaining_ms / 1000) + TRACK_END_FETCH_DELAY
+        self.state.track_end_fetch_track_id = track_id
+
+    def cancel_track_end_fetch(self):
+        self.state.track_end_fetch_at = None
+        self.state.track_end_fetch_track_id = None
+
     def run_api_action(self, action, label="Working..."):
         if self.state.api_busy:
             return None
@@ -264,16 +279,21 @@ class Spotify(BaseApp):
             self.reset_album_art_memory()
             if current_track_id:
                 self.queue_album_art_refresh(current_track_id)
-        if (
+        track_change_fetch_pending = (
             previous_requested_track_id and
             current_track_id == previous_requested_track_id and
             self.state.playback_fetch_until and
             time.time() < self.state.playback_fetch_until
-        ):
+        )
+        if track_change_fetch_pending:
             self.state.playback_fetch_at = time.time() + 1
         else:
             self.state.playback_fetch_until = None
             self.state.playback_fetch_track_id = None
+            if self.state.is_playing:
+                self.schedule_track_end_fetch()
+            else:
+                self.cancel_track_end_fetch()
 
     def should_fetch_recently_played(self):
         if self.state.recently_played_attempts < RECENTLY_PLAYED_BURST_LIMIT:
@@ -478,11 +498,17 @@ class Spotify(BaseApp):
 
         def play_pause(self):
             if self.state.is_playing:
+                paused_progress = self.state.get_current_progress()
                 self.spotify_client.pause()
+                self.state.progress_ms = paused_progress
+                self.state.is_playing = False
+                self.cancel_track_end_fetch()
             else:
                 self.spotify_client.play()
-            self.state.is_playing = not self.state.is_playing
+                self.state.is_playing = True
             self.state.last_progress_update = time.time()
+            if self.state.is_playing:
+                self.schedule_track_end_fetch()
             self.state.force_redraw = True
 
         def next_track(self):
@@ -1850,6 +1876,10 @@ class Spotify(BaseApp):
                     self.state.playback_fetch_at is not None and
                     time.time() >= self.state.playback_fetch_at
                 )
+                track_end_fetch_due = (
+                    self.state.track_end_fetch_at is not None and
+                    time.time() >= self.state.track_end_fetch_at
+                )
                 ready_to_fetch = (
                     not self.state.latest_fetch or
                     time.time() - self.state.latest_fetch > PLAYBACK_FETCH_INTERVAL
@@ -1862,11 +1892,14 @@ class Spotify(BaseApp):
                     )
                 )
                 recently_touched = time.time() - self.state.last_touch_time < TOUCH_FETCH_GRACE
-                if missing_track_fetch_due or scheduled_fetch_due or (ready_to_fetch and not recently_touched):
+                if missing_track_fetch_due or scheduled_fetch_due or track_end_fetch_due or (ready_to_fetch and not recently_touched):
                     self.state.latest_fetch = time.time()
                     self.state.playback_fetch_at = None
+                    if track_end_fetch_due:
+                        self.cancel_track_end_fetch()
                     previous_requested_track_id = self.state.playback_fetch_track_id
                     allow_recently_played = (
+                        not track_end_fetch_due and
                         self.state.playback_fetch_allow_recently and
                         self.should_fetch_recently_played()
                     )

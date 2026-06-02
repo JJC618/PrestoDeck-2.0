@@ -253,6 +253,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 1.0.1
+
+- Added a single estimated track-end `/state` refresh 3 seconds after the current track should naturally finish, with pause/resume handling.
+
 ### 1.0.0
 
 - First stable public release after soak testing confirmed controlled idle Spotify API usage.
