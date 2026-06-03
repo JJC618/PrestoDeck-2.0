@@ -265,7 +265,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
-### 1.0.3
+### 1.1.2
 
 - Added setup support for choosing the Raspberry Pi album-art cache size.
 - Added automatic Pillow installation for bridge album-art overlay processing.
