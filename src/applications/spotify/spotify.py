@@ -1465,6 +1465,7 @@ class Spotify(BaseApp):
                                     if action == "play":
                                         self.spotify_client.play(uris=[track.get("uri")])
                                         self.state.is_playing = True
+                                        self.schedule_track_change_fetch()
                                     else:
                                         self.spotify_client.add_to_queue(track.get("uri"))
                                 except Exception as e:

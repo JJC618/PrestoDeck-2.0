@@ -265,6 +265,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 1.1.4
+
+- Added the same human-triggered fresh playback refresh after playing a selected search result.
+
 ### 1.1.3
 
 - Added a human-triggered fresh playback refresh after selecting a playlist, so the displayed track updates promptly after starting a playlist context.
