@@ -485,13 +485,29 @@ class BridgeHandler(BaseHTTPRequestHandler):
         return sum(path.stat().st_size for path in ALBUM_ART_CACHE.glob("*") if path.is_file())
 
     def purge_album_art_cache(self):
+        removed_files = 0
+        removed_bytes = 0
         if not ALBUM_ART_CACHE.exists():
-            return
+            return removed_files, removed_bytes
         for path in ALBUM_ART_CACHE.glob("*"):
             if path.is_file():
-                path.unlink()
+                try:
+                    removed_bytes += path.stat().st_size
+                    path.unlink()
+                    removed_files += 1
+                except OSError:
+                    pass
+        return removed_files, removed_bytes
 
     def handle_post(self, path, query, body):
+        if path == "/cache/album-art/clear":
+            removed_files, removed_bytes = self.purge_album_art_cache()
+            return {
+                "ok": True,
+                "removed_files": removed_files,
+                "removed_bytes": removed_bytes,
+            }
+
         self.raise_if_spotify_blocked()
         if path == "/play":
             payload = {}

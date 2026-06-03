@@ -247,6 +247,14 @@ After copying new files to the Raspberry Pi:
 sudo systemctl restart presto-spotify-bridge
 ```
 
+## Clear Album-Art Cache
+
+To manually clear the Raspberry Pi album-art cache:
+
+```bash
+curl -X POST http://YOUR_PI_IP:8787/cache/album-art/clear
+```
+
 ## Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, playlist, album-art, SD card, and Raspberry Pi service issues.
