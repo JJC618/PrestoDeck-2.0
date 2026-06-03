@@ -261,6 +261,11 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 1.0.2
+
+- Reduced playback `/state` bursts after track changes by shortening retry windows and using a longer bridge cache for routine state checks.
+- Added a manual Raspberry Pi album-art cache clear endpoint.
+
 ### 1.0.1
 
 - Added a single estimated track-end `/state` refresh 3 seconds after the current track should naturally finish, with pause/resume handling.

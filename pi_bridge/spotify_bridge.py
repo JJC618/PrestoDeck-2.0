@@ -50,7 +50,9 @@ QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
-BRIDGE_VERSION = "1.0.1"
+BRIDGE_VERSION = "1.0.2"
+STATE_CACHE_SECONDS = 30
+FRESH_STATE_CACHE_SECONDS = 3
 
 
 class SpotifyBridgeError(Exception):
@@ -229,7 +231,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self.preload_current_album_art_soon(track)
             return state
         if path == "/state":
-            state = self.get_playback_state(max_age=3)
+            fresh = query.get("fresh", ["0"])[0] in ("1", "true", "yes")
+            max_age = FRESH_STATE_CACHE_SECONDS if fresh else STATE_CACHE_SECONDS
+            state = self.get_playback_state(max_age=max_age)
             return state
         if path == "/album-art/current":
             return self.send_current_album_art(query)

@@ -27,6 +27,8 @@ class StartupError(Exception):
 RECENTLY_PLAYED_BURST_LIMIT = 2
 RECENTLY_PLAYED_SLOW_INTERVAL = 600
 TRACK_END_FETCH_DELAY = 3
+TRACK_CHANGE_FETCH_RETRY_SECONDS = 2
+TRACK_CHANGE_FETCH_WINDOW_SECONDS = 5
 
 
 REQUIRED_SD_ASSETS = (
@@ -214,7 +216,7 @@ class Spotify(BaseApp):
     def schedule_track_change_fetch(self):
         now = time.time()
         self.state.playback_fetch_at = now + 1
-        self.state.playback_fetch_until = now + 6
+        self.state.playback_fetch_until = now + TRACK_CHANGE_FETCH_WINDOW_SECONDS
         self.state.playback_fetch_track_id = (self.state.track or {}).get("id")
         self.state.playback_fetch_allow_recently = True
 
@@ -286,7 +288,7 @@ class Spotify(BaseApp):
             time.time() < self.state.playback_fetch_until
         )
         if track_change_fetch_pending:
-            self.state.playback_fetch_at = time.time() + 1
+            self.state.playback_fetch_at = time.time() + TRACK_CHANGE_FETCH_RETRY_SECONDS
         else:
             self.state.playback_fetch_until = None
             self.state.playback_fetch_track_id = None
@@ -1908,6 +1910,7 @@ class Spotify(BaseApp):
                         lambda: fetch_state(
                             self.spotify_client,
                             allow_recently_played=allow_recently_played,
+                            fresh=missing_track_fetch_due or scheduled_fetch_due or track_end_fetch_due,
                         ),
                         "Failed fetching playback state:",
                     )
@@ -1997,7 +2000,7 @@ class Spotify(BaseApp):
             gc.collect()
             await asyncio.sleep_ms(200)
 
-def fetch_state(spotify_client, startup=False, raise_errors=False, allow_recently_played=True):
+def fetch_state(spotify_client, startup=False, raise_errors=False, allow_recently_played=True, fresh=False):
     """Fetches the current playback state from Spotify."""
     current_track = None
     is_playing = False
@@ -2013,7 +2016,7 @@ def fetch_state(spotify_client, startup=False, raise_errors=False, allow_recentl
         if startup and hasattr(spotify_client, "startup_state"):
             resp = spotify_client.startup_state()
         else:
-            resp = spotify_client.current_playing()
+            resp = spotify_client.current_playing(fresh=fresh)
         if resp and resp.get("item"):
             current_track = resp["item"]
             is_playing = resp.get("is_playing")

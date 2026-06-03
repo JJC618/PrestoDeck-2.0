@@ -66,8 +66,8 @@ class SpotifyBridgeClient:
     def previous(self):
         return self.post("/previous")
 
-    def current_playing(self):
-        return self.get("/state")
+    def current_playing(self, fresh=False):
+        return self.get("/state?fresh=1" if fresh else "/state")
 
     def recently_played(self):
         return self.get("/recently-played")
@@ -193,8 +193,8 @@ class SpotifyBridgeOnlyClient:
     def previous(self):
         return self.call("previous")
 
-    def current_playing(self):
-        return self.call("current_playing")
+    def current_playing(self, fresh=False):
+        return self.call("current_playing", fresh=fresh)
 
     def recently_played(self):
         return self.call("recently_played")
