@@ -1294,6 +1294,7 @@ class Spotify(BaseApp):
                                 try:
                                     self.spotify_client.play(context_uri=target)
                                     self.state.is_playing = True
+                                    self.schedule_track_change_fetch()
                                 except Exception as e:
                                     print("Failed starting context play:", e)
                                 self.state.menu_mode = 0

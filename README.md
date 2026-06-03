@@ -265,6 +265,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 1.1.3
+
+- Added a human-triggered fresh playback refresh after selecting a playlist, so the displayed track updates promptly after starting a playlist context.
+
 ### 1.1.2
 
 - Added setup support for choosing the Raspberry Pi album-art cache size.
