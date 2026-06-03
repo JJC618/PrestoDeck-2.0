@@ -10,6 +10,8 @@ From the `PrestoDeck` folder on the Raspberry Pi:
 bash pi_bridge/install_service.sh
 ```
 
+The installer will install `python3-pil` if it is missing. The bridge uses it to bake the fullscreen album-art overlay into cached 480px artwork.
+
 The installer creates and starts this systemd service:
 
 ```text
@@ -86,5 +88,6 @@ The health response includes the bridge version, whether Spotify is rate-limited
 - `POST /liked/remove`
 - `POST /liked/contains`
 - `POST /playlist/add`
+- `POST /cache/album-art/clear`
 
-The bridge reads Spotify credentials from `src/secrets.py`.
+The bridge reads Spotify credentials from `src/secrets.py`. It also reads optional `ALBUM_ART_CACHE_MAX_BYTES`; if that is not set, the album-art cache defaults to 1GB.

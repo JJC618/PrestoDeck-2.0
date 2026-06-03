@@ -12,11 +12,17 @@ import hashlib
 import sys
 import threading
 import time
+from io import BytesIO
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 from urllib.request import Request, urlopen
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,14 +51,21 @@ project_secrets = load_project_secrets()
 SPOTIFY_API = "https://api.spotify.com/v1"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 ALBUM_ART_CACHE = ROOT / "cache" / "album_art"
-ALBUM_ART_CACHE_MAX_BYTES = 1024 * 1024 * 1024
+ALBUM_ART_CACHE_MAX_BYTES = int(
+    getattr(project_secrets, "ALBUM_ART_CACHE_MAX_BYTES", 1024 * 1024 * 1024)
+)
 QUEUE_PRELOAD_LIMIT = 5
 QUEUE_PRELOAD_SECONDS = 60
 PRESTO_ACTIVE_SECONDS = 45
 ALBUM_ART_PRELOAD_SIZES = (250, 480)
-BRIDGE_VERSION = "1.0.2"
+BRIDGE_VERSION = "1.0.3"
 STATE_CACHE_SECONDS = 30
 FRESH_STATE_CACHE_SECONDS = 3
+FULLSCREEN_TOP_OVERLAY_SIZE = 480
+FULLSCREEN_TOP_OVERLAY_PATHS = (
+    ROOT / "pi_bridge" / "fullscreen_top_overlay.png",
+    ROOT / "sd_card" / "fullscreen_top_overlay.png",
+)
 
 
 class SpotifyBridgeError(Exception):
@@ -462,7 +475,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def album_art_cache_path_for_key(self, key, size):
         ALBUM_ART_CACHE.mkdir(parents=True, exist_ok=True)
-        return ALBUM_ART_CACHE / "{}_{}.jpg".format(key, size)
+        suffix = "{}".format(size)
+        if self.fullscreen_top_overlay_enabled(size):
+            suffix += "_top_overlay"
+        return ALBUM_ART_CACHE / "{}_{}.jpg".format(key, suffix)
 
     def fetch_album_art(self, image_url, size, cache_path):
         resize_url = "https://wsrv.nl/?url={}&w={}&h={}".format(image_url, size, size)
@@ -470,11 +486,47 @@ class BridgeHandler(BaseHTTPRequestHandler):
         try:
             with urlopen(req, timeout=10) as response:
                 payload = response.read()
+                payload = self.apply_fullscreen_top_overlay(payload, size)
                 self.save_album_art_cache_file(cache_path, payload)
         except HTTPError as e:
             raise SpotifyBridgeError(e.code, e.reason)
         except URLError as e:
             raise SpotifyBridgeError(502, str(e.reason))
+
+    def fullscreen_top_overlay_path(self):
+        for path in FULLSCREEN_TOP_OVERLAY_PATHS:
+            if path.exists():
+                return path
+        return None
+
+    def fullscreen_top_overlay_enabled(self, size):
+        return size == FULLSCREEN_TOP_OVERLAY_SIZE and self.fullscreen_top_overlay_path() is not None
+
+    def apply_fullscreen_top_overlay(self, payload, size):
+        overlay_path = self.fullscreen_top_overlay_path()
+        if size != FULLSCREEN_TOP_OVERLAY_SIZE or not overlay_path:
+            return payload
+        if Image is None:
+            print("Fullscreen top overlay skipped: Pillow not installed")
+            return payload
+
+        try:
+            base = Image.open(BytesIO(payload)).convert("RGBA")
+            overlay = Image.open(overlay_path).convert("RGBA")
+            if overlay.width != base.width:
+                overlay_height = max(1, int(overlay.height * base.width / overlay.width))
+                overlay = overlay.resize((base.width, overlay_height), Image.LANCZOS)
+
+            combined = Image.new("RGBA", base.size)
+            combined.paste(base, (0, 0))
+            combined.alpha_composite(overlay, (0, 0))
+
+            output = BytesIO()
+            combined.convert("RGB").save(output, format="JPEG", quality=88, optimize=True)
+            return output.getvalue()
+        except Exception as e:
+            print("Fullscreen top overlay failed:", e)
+            return payload
 
     def save_album_art_cache_file(self, cache_path, payload):
         ALBUM_ART_CACHE.mkdir(parents=True, exist_ok=True)

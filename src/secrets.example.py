@@ -12,3 +12,6 @@ SPOTIFY_CREDENTIALS = {
     "client_secret": "your_client_secret",
     "device_id": None,
 }
+
+# Optional. The token helper can generate this line. Default is 1GB.
+ALBUM_ART_CACHE_MAX_BYTES = 1024 * 1024 * 1024
