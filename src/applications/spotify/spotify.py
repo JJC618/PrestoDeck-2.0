@@ -1999,7 +1999,7 @@ class Spotify(BaseApp):
                     await asyncio.sleep_ms(200)
                     continue
 
-                if prev_state != self.state or self.state.force_redraw:
+                if self.state.menu_mode == 0 and (prev_state != self.state or self.state.force_redraw):
                     self.state.force_redraw = False
                     
                     self.clear(1)
