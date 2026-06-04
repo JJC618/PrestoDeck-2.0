@@ -109,7 +109,6 @@ class Spotify(BaseApp):
         self.device_zones = []
         self.playlist_zones = []
         self.playlist_nav_zones = []
-        self.queue_zones = []
         self.keyboard_zones = []
         self.keyboard_last_action = None
         self.keyboard_last_press_at = 0
@@ -1136,7 +1135,6 @@ class Spotify(BaseApp):
     def render_queue_screen(self):
         """Draws upcoming queue tracks."""
         self.clear(1)
-        self.queue_zones = []
 
         self.display.set_pen(self.colors._BLACK)
         self.display.rectangle(0, 0, self.width, self.height)
@@ -1164,16 +1162,6 @@ class Spotify(BaseApp):
                 y_offset += row_height
 
         self.presto.update()
-
-    def play_queue_from_index(self, index):
-        """Starts playback from a selected queue entry and keeps following queued tracks."""
-        tracks = self.state.queue_data[index:]
-        uris = [track.get("uri") for track in tracks if track.get("uri")]
-        if uris:
-            self.spotify_client.play(uris=uris)
-            self.state.is_playing = True
-            self.state.latest_fetch = None
-            self.state.force_redraw = True
 
     def fetch_and_render_playlists(self):
         """Downloads playlist metadata using the backend endpoint module."""

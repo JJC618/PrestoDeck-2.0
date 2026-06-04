@@ -271,6 +271,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 - Added automatic Pillow installation for bridge album-art overlay processing.
 - Added a fullscreen album-art top overlay that is baked into cached 480px artwork for better progress-bar readability.
 - Added human-triggered fresh playback refreshes after selecting a playlist or playing a selected search result.
+- Kept the queue screen view-only so selecting a displayed queue item cannot replace Spotify's active queue.
 
 ### 1.0.2
 
