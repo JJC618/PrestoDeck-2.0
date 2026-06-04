@@ -16,6 +16,7 @@ cd "${CLONE_DIR}"
 
 required_files="
 README.md
+CHANGELOG.md
 src/main.py
 src/base.py
 src/secrets.example.py
