@@ -194,7 +194,7 @@ class Spotify(BaseApp):
     def display_startup_message(self, text, error=None):
         self.clear(1)
         self.display.set_pen(self.ui_gray_pen if hasattr(self, "ui_gray_pen") else self.startup_gray_pen)
-        version = "PrestoDeck {}".format(APP_VERSION)
+        version = "PrestoDeck v{}".format(APP_VERSION)
         self.display.text(version, self.startup_text_x(version, 0.6), 12, scale=0.6)
         self.display.set_pen(self.colors.WHITE)
         self.display.set_thickness(2)
