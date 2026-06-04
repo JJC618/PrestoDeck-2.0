@@ -17,6 +17,7 @@ from applications.spotify.spotify_settings import (
     TOUCH_FETCH_GRACE,
 )
 from applications.spotify.spotify_state import State
+from applications.spotify.spotify_usage import MenuUsage
 from base import BaseApp
 
 
@@ -99,6 +100,7 @@ class Spotify(BaseApp):
         try:
             self.state = State()
             self.spotify_client = self.get_spotify_client()
+            self.menu_usage = MenuUsage()
         except StartupError as e:
             self.halt_startup_error("Loading Spotify...", str(e))
         self.wait_for_message_minimum(startup_message_at, 2)
@@ -659,10 +661,8 @@ class Spotify(BaseApp):
         try:
             resp = self.spotify_client.devices()
             if resp and "devices" in resp:
-                self.state.devices_data = [
-                    (d["name"], d["id"], d.get("is_active", False))
-                    for d in resp["devices"] if d
-                ]
+                devices = [(d["name"], d["id"], d.get("is_active", False)) for d in resp["devices"] if d]
+                self.state.devices_data = self.menu_usage.sort_items("devices", devices, 1)
                 self.state.device_page = 0
         except Exception as e:
             print("Error retrieving network speakers:", e)
@@ -1182,7 +1182,7 @@ class Spotify(BaseApp):
             if resp and "items" in resp:
                 items = resp["items"]
                 raw_list = [(p["name"], p["uri"]) for p in items if p]
-                self.playlists_data = raw_list
+                self.playlists_data = self.menu_usage.sort_items("playlists", raw_list, 1)
                 self.state.playlist_page = 0
                 self.playlists_fetched_at = time.time()
         except Exception as e:
@@ -1283,6 +1283,8 @@ class Spotify(BaseApp):
                                     self.spotify_client.play(context_uri=target)
                                     self.state.is_playing = True
                                     self.schedule_track_change_fetch()
+                                    self.menu_usage.record("playlists", target)
+                                    self.playlists_data = self.menu_usage.sort_items("playlists", self.playlists_data, 1)
                                 except Exception as e:
                                     print("Failed starting context play:", e)
                                 self.state.menu_mode = 0
@@ -1331,10 +1333,14 @@ class Spotify(BaseApp):
                                 try:
                                     self.spotify_client.transfer_playback(dev_id)
                                     self.spotify_client.session.device_id = dev_id
+                                    self.menu_usage.record("devices", dev_id)
                                     self.state.devices_data = [
                                         (name, item_dev_id, item_dev_id == dev_id)
                                         for name, item_dev_id, is_active in self.state.devices_data
                                     ]
+                                    self.state.devices_data = self.menu_usage.sort_items(
+                                        "devices", self.state.devices_data, 1
+                                    )
                                 except Exception as e:
                                     print("Failed device transfer:", e)
                                 self.state.menu_mode = 1

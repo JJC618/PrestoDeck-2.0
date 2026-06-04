@@ -46,3 +46,5 @@ The app also checks `/sd/applications/spotify` before `/sd`, so advanced users c
   icon.png
   icons/
 ```
+
+The app creates `/sd/cache/spotify_menu_usage.json` automatically. This small settings file stores playlist and speaker selection counts so frequently used menu items appear first.
