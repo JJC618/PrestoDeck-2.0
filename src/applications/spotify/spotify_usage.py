@@ -8,6 +8,7 @@ from applications.spotify.spotify_settings import APP_ASSET_ROOT, SD_ASSET_ROOTS
 
 
 USAGE_FILE_NAME = "spotify_menu_usage.json"
+MAX_SEARCH_HISTORY = 20
 
 
 def usage_file_path():
@@ -34,6 +35,7 @@ class MenuUsage:
             "devices": {},
             "playlists": {},
         }
+        self.searches = []
         self.load()
 
     def load(self):
@@ -46,13 +48,18 @@ class MenuUsage:
                 values = data.get(category, {})
                 if isinstance(values, dict):
                     self.counts[category] = values
+            searches = data.get("searches", [])
+            if isinstance(searches, list):
+                self.searches = [item for item in searches if isinstance(item, str)][:MAX_SEARCH_HISTORY]
         except Exception as e:
             print("Menu usage settings not loaded:", e)
 
     def save(self):
         try:
             with open(self.path, "w") as f:
-                f.write(json.dumps(self.counts))
+                data = dict(self.counts)
+                data["searches"] = self.searches
+                f.write(json.dumps(data))
         except Exception as e:
             print("Menu usage settings not saved:", e)
 
@@ -73,3 +80,23 @@ class MenuUsage:
         indexed = list(enumerate(items))
         indexed.sort(key=lambda pair: (-self.count(category, pair[1][key_index]), pair[0]))
         return [pair[1] for pair in indexed]
+
+    def record_search(self, query):
+        query = query.strip()
+        if not query:
+            return
+        query_lower = query.lower()
+        self.searches = [item for item in self.searches if item.lower() != query_lower]
+        self.searches.insert(0, query)
+        self.searches = self.searches[:MAX_SEARCH_HISTORY]
+        self.save()
+
+    def search_suggestion(self, query):
+        if not query.strip():
+            return None
+        query_lower = query.lower()
+        for item in self.searches:
+            item_lower = item.lower()
+            if item_lower.startswith(query_lower) and item_lower != query_lower:
+                return item
+        return None

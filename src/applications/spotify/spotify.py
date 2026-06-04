@@ -112,6 +112,8 @@ class Spotify(BaseApp):
         self.playlist_zones = []
         self.playlist_nav_zones = []
         self.keyboard_zones = []
+        self.search_suggestion = None
+        self.search_suggestion_zone = None
         self.keyboard_last_action = None
         self.keyboard_last_press_at = 0
         self.search_result_zones = []
@@ -138,6 +140,7 @@ class Spotify(BaseApp):
         self.pending_art_attempts = 0
         self.active_speaker_pen = self.display.create_pen(89, 188, 97)
         self.ui_gray_pen = self.display.create_pen(179, 179, 179)
+        self.search_suggestion_pen = self.display.create_pen(90, 90, 90)
         self.keyboard_key_pen = self.ui_gray_pen
         self.keyboard_key_shadow_pen = self.ui_gray_pen
         self.keyboard_label_pen = self.display.create_pen(8, 8, 8)
@@ -673,6 +676,7 @@ class Spotify(BaseApp):
         query = self.state.search_query.strip()
         if not query:
             return
+        self.menu_usage.record_search(query)
 
         self.clear(1)
         self.display.set_pen(self.colors._BLACK)
@@ -699,6 +703,8 @@ class Spotify(BaseApp):
         """Draws the search keyboard and query field."""
         self.clear(1)
         self.keyboard_zones = []
+        self.search_suggestion = None
+        self.search_suggestion_zone = None
 
         self.display.set_pen(self.colors._BLACK)
         self.display.rectangle(0, 0, self.width, self.height)
@@ -709,6 +715,8 @@ class Spotify(BaseApp):
         self.display.set_pen(self.colors.WHITE)
         query = self.state.search_query[-24:] if self.state.search_query else "Search tracks"
         self.display.text(query, 18, 18, scale=0.8)
+        if self.state.search_query:
+            self.draw_search_suggestion(query)
 
         for button in self.buttons:
             if button.name == "Close Queue":
@@ -717,6 +725,29 @@ class Spotify(BaseApp):
 
         self.draw_qwerty_keyboard(keyboard_y)
         self.presto.update()
+
+    def draw_search_suggestion(self, displayed_query):
+        suggestion = self.menu_usage.search_suggestion(self.state.search_query)
+        if not suggestion:
+            return
+
+        suffix = suggestion[len(self.state.search_query):]
+        suggestion_x = 18 + self.measure_text_width(displayed_query, 0.8)
+        field_right = self.width - 102
+        while suffix and suggestion_x + self.measure_text_width(suffix, 0.8) > field_right:
+            suffix = suffix[:-1]
+        if not suffix:
+            return
+
+        self.display.set_pen(self.search_suggestion_pen)
+        self.display.text(suffix, suggestion_x, 18, scale=0.8)
+        self.search_suggestion = suggestion
+        self.search_suggestion_zone = (
+            suggestion_x,
+            6,
+            max(24, self.measure_text_width(suffix, 0.8)),
+            42,
+        )
 
     def draw_qwerty_keyboard(self, keyboard_y):
         """Draws a compact on-screen QWERTY keyboard."""
@@ -1377,36 +1408,46 @@ class Spotify(BaseApp):
                     tx, ty = self.touch.x, self.touch.y
                     hit_action = False
 
-                    for action, bounds in self.keyboard_zones:
-                        bx, by, bw, bh = bounds
+                    if self.search_suggestion and self.search_suggestion_zone:
+                        bx, by, bw, bh = self.search_suggestion_zone
                         if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
-                            now = time.time()
-                            if action == self.keyboard_last_action and now - self.keyboard_last_press_at < 0.12:
-                                hit_action = True
-                                break
-                            self.keyboard_last_action = action
-                            self.keyboard_last_press_at = now
-                            hit_action = True
-                            if action == "space":
-                                if self.state.search_query:
-                                    self.state.search_query += " "
-                                self.state.t9_key = None
-                                self.state.t9_picker = None
-                            elif action == "back":
-                                self.state.search_query = self.state.search_query[:-1]
-                                self.state.t9_key = None
-                                self.state.t9_picker = None
-                            elif action == "search":
-                                self.state.t9_key = None
-                                self.state.t9_picker = None
-                                self.fetch_and_render_search_results()
-                            else:
-                                if len(self.state.search_query) < 32:
-                                    self.state.search_query += action
-                                self.state.t9_key = None
-                                self.state.t9_picker = None
+                            self.state.search_query = self.search_suggestion[:32]
+                            self.state.t9_key = None
+                            self.state.t9_picker = None
                             self.state.force_redraw = True
-                            break
+                            hit_action = True
+
+                    if not hit_action:
+                        for action, bounds in self.keyboard_zones:
+                            bx, by, bw, bh = bounds
+                            if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
+                                now = time.time()
+                                if action == self.keyboard_last_action and now - self.keyboard_last_press_at < 0.12:
+                                    hit_action = True
+                                    break
+                                self.keyboard_last_action = action
+                                self.keyboard_last_press_at = now
+                                hit_action = True
+                                if action == "space":
+                                    if self.state.search_query:
+                                        self.state.search_query += " "
+                                    self.state.t9_key = None
+                                    self.state.t9_picker = None
+                                elif action == "back":
+                                    self.state.search_query = self.state.search_query[:-1]
+                                    self.state.t9_key = None
+                                    self.state.t9_picker = None
+                                elif action == "search":
+                                    self.state.t9_key = None
+                                    self.state.t9_picker = None
+                                    self.fetch_and_render_search_results()
+                                else:
+                                    if len(self.state.search_query) < 32:
+                                        self.state.search_query += action
+                                    self.state.t9_key = None
+                                    self.state.t9_picker = None
+                                self.state.force_redraw = True
+                                break
 
                     if not hit_action:
                         for button in self.buttons:
