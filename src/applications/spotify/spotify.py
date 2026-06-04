@@ -574,6 +574,7 @@ class Spotify(BaseApp):
 
         def handle_top_right_press(self):
             if self.state.menu_mode == 1:
+                self.state.device_page = 0
                 self.state.menu_mode = 2
                 self.fetch_devices()
             else:
@@ -592,6 +593,7 @@ class Spotify(BaseApp):
                 self.state.search_results = []
                 self.state.selected_search_index = None
             else:
+                self.state.playlist_page = 0
                 self.state.menu_mode = 1
                 self.state.force_redraw = True
                 self.fetch_and_render_playlists()
@@ -600,6 +602,7 @@ class Spotify(BaseApp):
 
         def close_overlay(self):
             if self.state.menu_mode == 2:
+                self.state.playlist_page = 0
                 self.state.menu_mode = 1
             elif self.state.menu_mode == 5:
                 self.state.menu_mode = 4
@@ -1374,6 +1377,7 @@ class Spotify(BaseApp):
                                     )
                                 except Exception as e:
                                     print("Failed device transfer:", e)
+                                self.state.playlist_page = 0
                                 self.state.menu_mode = 1
                                 self.state.fullscreen_art = False
                                 self.state.force_redraw = True

@@ -1,5 +1,9 @@
 # Changelog
 
+### 1.2.4
+
+- Reset paged playlist and speaker menus to page one whenever they are opened.
+
 ### 1.2.3
 
 - Prevented player redraws from consuming a pending menu redraw, fixing occasional partial playlist, speaker, search, or queue screens.
