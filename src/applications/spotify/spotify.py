@@ -1275,7 +1275,8 @@ class Spotify(BaseApp):
 
     def run(self):
         """Starts the app's event loops."""
-        loop = asyncio.get_event_loop()
+        # Clear any tasks left behind by a prior editor run or soft reboot.
+        loop = asyncio.new_event_loop()
         loop.create_task(self.touch_handler_loop())
         loop.create_task(self.display_loop())
         loop.run_forever()

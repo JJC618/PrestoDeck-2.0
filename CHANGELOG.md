@@ -3,6 +3,9 @@
 ### 1.2.4
 
 - Reset paged playlist and speaker menus to page one whenever they are opened.
+- Reset the Presto event loop on launch so repeated editor runs or soft reboots cannot leave duplicate playback refresh tasks active.
+- Treated an empty but recent Spotify playback state as a valid bridge cache result, preventing idle-state request bursts from reaching Spotify.
+- Added bridge health counters for actual Spotify playback-state fetches, making API activity easier to verify independently of Presto-to-bridge requests.
 
 ### 1.2.3
 

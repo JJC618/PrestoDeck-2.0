@@ -158,6 +158,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
     state_lock = threading.Lock()
     state_cache = None
     state_cache_at = 0
+    state_spotify_fetches = 0
+    last_state_spotify_fetch_at = 0
     presto_active_until = 0
     spotify_blocked_until = 0
 
@@ -235,6 +237,11 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     int(now - self.__class__.state_cache_at)
                     if self.__class__.state_cache_at else None
                 ),
+                "spotify_state_fetches": self.__class__.state_spotify_fetches,
+                "last_spotify_state_fetch_age": (
+                    int(now - self.__class__.last_state_spotify_fetch_at)
+                    if self.__class__.last_state_spotify_fetch_at else None
+                ),
             }
         self.raise_if_spotify_blocked()
         if path == "/startup":
@@ -285,21 +292,23 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def get_playback_state(self, max_age=3):
         cls = self.__class__
         now = time.time()
-        if cls.state_cache and now - cls.state_cache_at < max_age:
+        if cls.state_cache is not None and now - cls.state_cache_at < max_age:
             return cls.state_cache
 
         with cls.state_lock:
             now = time.time()
-            if cls.state_cache and now - cls.state_cache_at < max_age:
+            if cls.state_cache is not None and now - cls.state_cache_at < max_age:
                 return cls.state_cache
             try:
+                cls.state_spotify_fetches += 1
+                cls.last_state_spotify_fetch_at = time.time()
                 state = self.session.request("GET", "/me/player")
                 self.attach_liked_state(state)
                 cls.state_cache = state
                 cls.state_cache_at = time.time()
                 return state
             except SpotifyBridgeError as e:
-                if e.status == 429 and cls.state_cache:
+                if e.status == 429 and cls.state_cache is not None:
                     self.set_spotify_block(e.retry_after)
                     print("Spotify rate limited playback state, using cached state")
                     return cls.state_cache
