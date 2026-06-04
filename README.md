@@ -265,6 +265,11 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 
 ## Changelog
 
+### 1.2.2
+
+- Added SD-card usage counters that place the most frequently selected playlists and speakers first without additional Spotify API calls.
+- Added SD-card-backed autocomplete suggestions from up to 500 recent searches, which can be tapped to complete the current search text without making an API call.
+
 ### 1.1.2
 
 - Added setup support for choosing the Raspberry Pi album-art cache size.
@@ -272,8 +277,6 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for WiFi, bridge, Spotify token, pl
 - Added a fullscreen album-art top overlay that is baked into cached 480px artwork for better progress-bar readability.
 - Added human-triggered fresh playback refreshes after selecting a playlist or playing a selected search result.
 - Kept the queue screen view-only so selecting a displayed queue item cannot replace Spotify's active queue.
-- Added SD-card usage counters that place the most frequently selected playlists and speakers first without additional Spotify API calls.
-- Added SD-card-backed recent search suggestions that can be tapped to complete the current search text without making an API call.
 
 ### 1.0.2
 
