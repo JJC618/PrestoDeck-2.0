@@ -213,6 +213,12 @@ print(len(secrets.WIFI_PASSWORD))
 
 Do not print your password. Check the SSID is exact and the password length looks right.
 
+## Presto Display Becomes Unresponsive
+
+If the screen stops responding to touch or appears stuck, reboot the Presto.
+
+If the problem happens repeatedly after a reboot, update the Presto files and Raspberry Pi bridge to the same latest version.
+
 ## Bridge Failed
 
 Check `SPOTIFY_BRIDGE_BASE_URL` in `src/secrets.py`:
