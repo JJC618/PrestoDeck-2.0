@@ -8,7 +8,7 @@ from applications.spotify.spotify_settings import APP_ASSET_ROOT, SD_ASSET_ROOTS
 
 
 USAGE_FILE_NAME = "spotify_menu_usage.json"
-MAX_SEARCH_HISTORY = 20
+MAX_SEARCH_HISTORY = 500
 
 
 def usage_file_path():
