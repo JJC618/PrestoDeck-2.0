@@ -5,6 +5,7 @@
 - Improved search keyboard usability by accepting one key per touch, while keeping backspace hold-to-delete.
 - Made previous-search autocomplete easier to use by allowing the full suggestion field to be tapped.
 - Preferred shorter matching previous searches first, so short completions can lead naturally into longer saved searches.
+- Centered search keyboard labels using measured text widths so key text aligns more accurately.
 
 ### 1.2.4
 

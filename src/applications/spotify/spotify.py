@@ -790,10 +790,10 @@ class Spotify(BaseApp):
         self.keyboard_zones.append((action, (x, y, width, height)))
 
     def draw_centered_keyboard_text(self, text, x, y, width, height, scale):
-        text_width = int(len(text) * 8 * scale)
+        text_width = self.measure_text_width(text, scale)
         text_height = int(14 * scale)
-        text_x = x + max(2, (width - text_width) // 2)
-        text_y = y + max(2, ((height - text_height) // 2) + 1)
+        text_x = x + ((width - text_width) // 2)
+        text_y = y + ((height - text_height) // 2) + 1
         self.display.set_pen(self.keyboard_label_pen)
         self.display.set_thickness(2)
         self.display.text(text, text_x, text_y, scale=scale)
