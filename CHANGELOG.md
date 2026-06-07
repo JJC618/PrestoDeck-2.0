@@ -6,6 +6,7 @@
 - Made previous-search autocomplete easier to use by allowing the full suggestion field to be tapped.
 - Preferred shorter matching previous searches first, so short completions can lead naturally into longer saved searches.
 - Centered search keyboard labels using measured text widths so key text aligns more accurately.
+- Added a short hold delay before backspace repeats, making single-character deletion easier while preserving hold-to-clear.
 
 ### 1.2.4
 

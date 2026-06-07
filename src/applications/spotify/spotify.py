@@ -30,6 +30,7 @@ RECENTLY_PLAYED_SLOW_INTERVAL = 600
 TRACK_END_FETCH_DELAY = 3
 TRACK_CHANGE_FETCH_RETRY_SECONDS = 2
 TRACK_CHANGE_FETCH_WINDOW_SECONDS = 5
+BACKSPACE_HOLD_REPEAT_DELAY = 0.5
 
 
 REQUIRED_SD_ASSETS = (
@@ -1427,24 +1428,35 @@ class Spotify(BaseApp):
                         for action, bounds in self.keyboard_zones:
                             bx, by, bw, bh = bounds
                             if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
-                                self.keyboard_last_action = action
-                                self.keyboard_last_press_at = time.time()
+                                now = time.time()
                                 hit_action = True
                                 if action == "space":
+                                    self.keyboard_last_action = action
+                                    self.keyboard_last_press_at = now
                                     if self.state.search_query:
                                         self.state.search_query += " "
                                     self.state.t9_key = None
                                     self.state.t9_picker = None
                                 elif action == "back":
+                                    repeat_while_held = True
+                                    if self.keyboard_last_action == action:
+                                        if now - self.keyboard_last_press_at < BACKSPACE_HOLD_REPEAT_DELAY:
+                                            break
+                                    else:
+                                        self.keyboard_last_action = action
+                                        self.keyboard_last_press_at = now
                                     self.state.search_query = self.state.search_query[:-1]
                                     self.state.t9_key = None
                                     self.state.t9_picker = None
-                                    repeat_while_held = True
                                 elif action == "search":
+                                    self.keyboard_last_action = action
+                                    self.keyboard_last_press_at = now
                                     self.state.t9_key = None
                                     self.state.t9_picker = None
                                     self.fetch_and_render_search_results()
                                 else:
+                                    self.keyboard_last_action = action
+                                    self.keyboard_last_press_at = now
                                     if len(self.state.search_query) < 32:
                                         self.state.search_query += action
                                     self.state.t9_key = None
@@ -1465,6 +1477,8 @@ class Spotify(BaseApp):
                             self.touch.poll()
                             await asyncio.sleep_ms(5)
                         self.keyboard_last_action = None
+                else:
+                    self.keyboard_last_action = None
             elif self.state.menu_mode == 5:
                 if self.touch.state:
                     tx, ty = self.touch.x, self.touch.y
