@@ -1,5 +1,11 @@
 # Changelog
 
+### 1.2.5
+
+- Improved search keyboard usability by accepting one key per touch, while keeping backspace hold-to-delete.
+- Made previous-search autocomplete easier to use by allowing the full suggestion field to be tapped.
+- Preferred shorter matching previous searches first, so short completions can lead naturally into longer saved searches.
+
 ### 1.2.4
 
 - Reset paged playlist and speaker menus to page one whenever they are opened.

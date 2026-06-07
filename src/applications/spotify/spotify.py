@@ -746,9 +746,9 @@ class Spotify(BaseApp):
         self.display.text(suffix, suggestion_x, 18, scale=0.8)
         self.search_suggestion = suggestion
         self.search_suggestion_zone = (
-            suggestion_x,
+            18,
             6,
-            max(24, self.measure_text_width(suffix, 0.8)),
+            field_right - 18,
             42,
         )
 
@@ -1412,6 +1412,7 @@ class Spotify(BaseApp):
                 if self.touch.state:
                     tx, ty = self.touch.x, self.touch.y
                     hit_action = False
+                    repeat_while_held = False
 
                     if self.search_suggestion and self.search_suggestion_zone:
                         bx, by, bw, bh = self.search_suggestion_zone
@@ -1426,12 +1427,8 @@ class Spotify(BaseApp):
                         for action, bounds in self.keyboard_zones:
                             bx, by, bw, bh = bounds
                             if bx <= tx <= (bx + bw) and by <= ty <= (by + bh):
-                                now = time.time()
-                                if action == self.keyboard_last_action and now - self.keyboard_last_press_at < 0.12:
-                                    hit_action = True
-                                    break
                                 self.keyboard_last_action = action
-                                self.keyboard_last_press_at = now
+                                self.keyboard_last_press_at = time.time()
                                 hit_action = True
                                 if action == "space":
                                     if self.state.search_query:
@@ -1442,6 +1439,7 @@ class Spotify(BaseApp):
                                     self.state.search_query = self.state.search_query[:-1]
                                     self.state.t9_key = None
                                     self.state.t9_picker = None
+                                    repeat_while_held = True
                                 elif action == "search":
                                     self.state.t9_key = None
                                     self.state.t9_picker = None
@@ -1462,7 +1460,10 @@ class Spotify(BaseApp):
                                     button.on_press(self)
                                     break
 
-                    if not self.touch.state:
+                    if hit_action and not repeat_while_held:
+                        while self.touch.state:
+                            self.touch.poll()
+                            await asyncio.sleep_ms(5)
                         self.keyboard_last_action = None
             elif self.state.menu_mode == 5:
                 if self.touch.state:

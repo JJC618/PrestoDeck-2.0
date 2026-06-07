@@ -95,8 +95,12 @@ class MenuUsage:
         if not query.strip():
             return None
         query_lower = query.lower()
-        for item in self.searches:
+        matches = []
+        for index, item in enumerate(self.searches):
             item_lower = item.lower()
             if item_lower.startswith(query_lower) and item_lower != query_lower:
-                return item
+                matches.append((len(item_lower), index, item))
+        if matches:
+            matches.sort()
+            return matches[0][2]
         return None
